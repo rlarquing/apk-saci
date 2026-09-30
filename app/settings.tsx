@@ -96,9 +96,10 @@ export default function SettingsScreen() {
         resultado.movimientosConError > 0
           ? `Movimientos con error: ${resultado.movimientosConError}`
           : null,
-        `Códigos QR: ${datos.qrs ?? 0}`,
-        `Precios: ${datos.precios}`,
-        `Tipos de medio: ${datos.tiposMedio}`,
+        `Etiquetas QR: ${datos.qrs ?? 0}`,
+        `Productos: ${datos.productos}`,
+        `Categorías: ${datos.categorias}`,
+        `Stock: ${datos.stock ?? 0}`,
         `Almacenes: ${datos.almacenes ?? 0}`,
       ]
         .filter(Boolean)

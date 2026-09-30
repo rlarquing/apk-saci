@@ -14,12 +14,14 @@ export interface LoginRequestDto {
 export interface LoginResponseDto {
   accessToken: string;
   refreshToken: string;
-  userId?: number | string;
+  userId?: string;
   userName?: string;
   email?: string;
   functions?: any[];
   menus?: any[];
+  /** SelectDto[] {value, label} del API: almacenes del usuario (ADMIN: todos) */
   almacenes?: any[];
+  /** SelectDto[] {value, label} del API: categorías */
   categorias?: any[];
   roles?: any[];  // {value: string, label: string}[] from API (SelectDto)
 }
@@ -60,20 +62,20 @@ export interface AlmacenDto {
 
 // ==================== MOVIMIENTO DTOs ====================
 
-/** Request para POST /api/movimiento/ (entrada) — alineado con CreateMovimientoDto de api-saci */
-export interface RegistrarEntradaRequestDto {
-  qrEscaneado: string;
-  almacen: string;
-  /** Fecha real del cobro en ISO (solo sincronización offline; opcional) */
-  fechaEntrada?: string;
-}
-
-/** Request para PATCH /api/movimiento/:id (salida) — alineado con UpdateMovimientoDto de api-saci */
-export interface RegistrarSalidaRequestDto {
-  qrEscaneado: string;
-  almacen: string;
-  /** Fecha real de la salida en ISO (solo sincronización offline; opcional) */
-  fechaSalida?: string;
+/**
+ * Request para POST /api/movimiento-inventario/entrada y /salida.
+ * Alineado con CreateEntradaDto/CreateSalidaDto del API: requiere qrCodigo
+ * o productoId, mas almacenId y cantidad (0.01-999999.99). Cualquier campo
+ * extra en el body provoca 400 (ValidationPipe forbidNonWhitelisted).
+ */
+export interface RegistrarMovimientoRequestDto {
+  qrCodigo?: string;
+  productoId?: string;
+  almacenId: string;
+  cantidad: number;
+  /** Fecha real en ISO (solo sincronización offline; opcional) */
+  fecha?: string;
+  observaciones?: string;
 }
 
 /** Response genérica de la API (ResponseDto) */
@@ -83,99 +85,82 @@ export interface ApiResponseDto {
   message: string;
 }
 
-export interface MovimientoDto {
-  id: string;
-  qr_codigo: string;
-  almacen_id: string;
-  almacen_nombre: string;
-  categoria_id: string;
-  categoria_nombre: string;
-  precio_id: string;
-  precio_unitario_cobrado: number;
-  fecha_entrada: string;
-  fecha_salida: string | null;
-  created_at: string;
-  updated_at: string;
+/**
+ * Registro diario del almacen (GET /api/registro-diario/actual/:almacenId).
+ * Resumen del DÍA actual: el endpoint no acepta fecha.
+ */
+export interface RegistroDiarioDto {
+  id?: string;
+  fecha?: string;
+  estado?: 'abierto' | 'cerrado';
+  almacen?: { id: string; nombre: string; descripcion?: string };
+  totalEntradas: number;
+  totalSalidas: number;
+  detalleCategorias: Array<{ categoria: string; entradas: number; salidas: number }>;
 }
 
-export interface MovimientoActivoDto {
-  id: string;
-  fecha_entrada: string;
-  almacen_id: string;
-  almacen_nombre: string;
-  categoria_nombre: string;
-  precio_monto: number;
-}
-
-/** Request POST /api/movimiento/estado — verificar varios QRs a la vez */
-export interface VerificarEstadoMovimientosRequestDto {
-  codigos: string[];
-}
-
-/** Response POST /api/movimiento/estado — alineado con EstadoMovimientoDto de api-saci */
-export interface EstadoMovimientoDto {
-  codigo: string;
-  dentro: boolean;
-  fechaSalida: string | null;
-}
-
-export interface DetallePorTipoDto {
-  categoria: string;
-  cantidad: number;
-  ingreso: number;
-}
-
-export interface ResumenAlmacenDto {
-  vehiculosDentro: number;
-  vehiculosSalieronHoy: number;
-  ingresosHoy: number;
-  detallePorTipo: DetallePorTipoDto[];
+/**
+ * Fila de stock derivado (GET /api/movimiento-inventario/stock).
+ * Sin filtros retorna el stock de todos los almacenes del usuario.
+ */
+export interface StockApiDto {
+  productoId: string;
+  almacenId: string;
+  productoNombre: string;
+  productoCodigo: string;
+  almacenNombre: string;
+  stock: number;
 }
 
 // ==================== QR DTOs ====================
 
+/**
+ * Response de GET /api/qr/validar (ValidarQrResponseDto del API).
+ * puede_entrada es true siempre que la etiqueta no esté anulada;
+ * puede_salida/puede_ajuste solo con estado 'asignado'.
+ */
 export interface ValidarQRResponseDto {
   valido: boolean;
   qr: QRDto | null;
   mensaje: string;
-  puede_entrar: boolean;
-  puede_salir: boolean;
-  movimiento_activo: MovimientoActivoDto | null;
+  puede_entrada: boolean;
+  puede_salida: boolean;
+  puede_ajuste: boolean;
+  movimiento_activo: any | null; // Siempre null en SACI (informativo)
 }
 
 export interface QRDto {
   id: string;
   codigo: string;
-  lote_id: string;
-  lote_nombre: string;
-  activo: boolean;
-  categoria_id: string | null;
-  categoria_nombre: string | null;
-  created_at: string;
-}
-
-// ==================== PRECIO DTOs ====================
-
-export interface PrecioDto {
-  id: string;
-  monto: number;
-  categoria_id: string;
-  categoria_nombre: string;
+  numeroConsecutivo: number;
+  producto_id: string | null;
+  producto_nombre: string | null;
+  producto_codigo: string | null;
   almacen_id: string | null;
+  almacen_nombre: string | null;
+  lote_id: string | null;
+  estado: string; // 'disponible' | 'asignado' | 'anulado'
   activo: boolean;
-  fecha_vigencia_inicio: string;
-  fecha_vigencia_fin: string | null;
   created_at: string;
-  updated_at: string;
 }
 
-export interface PreciosPorTipoDto {
-  categoria_id: string;
-  categoria_nombre: string;
-  precios: PrecioDto[];
-}
+// ==================== PRODUCTO / CATEGORIA DTOs ====================
 
-// ==================== TIPO MEDIO DTOs ====================
+/** ReadProductoDto del API (listado) */
+export interface ProductoDto {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  categoriaId: string | null;
+  categoriaNombre: string | null;
+  unidadId?: string | null;
+  unidadNombre: string | null;
+  stockMinimo: number;
+  activo: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
 
 export interface CategoriaDto {
   id: string;
@@ -197,25 +182,38 @@ export interface SyncRequestDto {
 export interface MovimientoPendienteSyncDto {
   id: string;
   operacion: 'entrada' | 'salida';
+  /**
+   * Shape que consume sync.service (movimientoInventarioService.entrada/salida):
+   * requiere qrCodigo o productoId, mas almacenId y cantidad. El DTO del API
+   * solo declara @IsObject, pero sin estos campos falla en runtime.
+   */
   data: {
     qrCodigo?: string;
-    almacen?: string;
-    movimiento?: string;
+    productoId?: string;
+    almacenId: string;
+    cantidad: number;
+    fecha?: string;
+    observaciones?: string;
   };
   createdAt: string;
 }
 
-export interface PrecioSyncDto {
+export interface ProductoSyncDto {
   id: string;
-  valor: number;
-  categoria: string;
+  codigo: string;
+  nombre: string;
+  categoriaId: string;
   categoriaNombre: string;
-  almacen: string | null;
+  unidadNombre: string;
+  stockMinimo: number;
   activo: boolean;
-  fechaInicioVigencia: string;
-  fechaFinVigencia: string | null;
-  createdAt: string;
   updatedAt: string;
+}
+
+export interface StockSyncDto {
+  productoId: string;
+  almacenId: string;
+  stock: number;
 }
 
 export interface CategoriaSyncDto {
@@ -232,12 +230,12 @@ export interface SyncResponseDto {
   movimientosSincronizados: number;
   movimientosConError: number;
   datosActualizados: {
-    precios: number;
+    productos: number;
     categorias: number;
-    usuarios: number;
   };
   errores: SyncErrorDto[];
-  precios: PrecioSyncDto[];
+  productos: ProductoSyncDto[];
+  stock: StockSyncDto[];
   categorias: CategoriaSyncDto[];
 }
 

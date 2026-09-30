@@ -1,50 +1,50 @@
 /**
  * Use Case: ObtenerResumenAlmacenUseCase
- * Obtiene el resumen del estado actual del almacen
- * Campos alineados con la API (api-saci) ResumenAlmacenDto
+ * Obtiene el resumen de movimientos del día en un almacen.
  *
  * Estrategia offline-first:
  * 1. El ledger local (SQLite) es la base: refleja de inmediato cada entrada y
- *    salida registrada en el teléfono, sin esperar al servidor ni al cierre del
- *    día. Permanece en el dispositivo y sobrevive reinicios de la app.
- * 2. Con el servidor disponible se reconcilia la lista de activos (cierra en
- *    local lo que la web u otro teléfono ya cerró) y se mergea el resumen del
- *    servidor con el local: se toma el máximo de cada contador y los ingresos
- *    del día se suman sin duplicar (los movimientos sincronizados existen en
- *    ambos lados; los pendientes solo en local).
+ *    salida registrada en el teléfono, sin esperar al servidor. Permanece en
+ *    el dispositivo y sobrevive reinicios de la app.
+ * 2. Con el servidor disponible se consulta el registro diario del API
+ *    (GET /api/registro-diario/actual/:almacenId) y se mergea con el local:
+ *    se toma el máximo de cada contador porque cada lado ve movimientos que
+ *    el otro puede no ver (pendientes offline en el teléfono; movimientos de
+ *    la web en el servidor).
+ * 3. Las alertas de stock bajo mínimo se calculan SIEMPRE desde las caches
+ *    locales de productos y stock (el registro diario del API no las trae).
  */
 import { MovimientoRepository } from '@/src/domain';
 import { SyncRepository } from '@/src/domain';
-import { ResumenAlmacen } from '../entities';
+import { ProductoRepository } from '@/src/domain';
+import { StockRepository } from '@/src/domain';
+import { ResumenAlmacen, DetalleCategoria } from '../entities';
 
 export class ObtenerResumenAlmacenUseCase {
   constructor(
     private movimientoRepository: MovimientoRepository,
-    private syncRepository: SyncRepository
+    private syncRepository: SyncRepository,
+    private productoRepository: ProductoRepository,
+    private stockRepository: StockRepository
   ) {}
 
   async execute(almacenId: string): Promise<ResumenAlmacen> {
     // 1. Base: ledger local del teléfono (siempre disponible, siempre fresco)
     const resumenLocal = await this.movimientoRepository.obtenerResumenLocal(almacenId);
 
-    // 2. Intentar reconciliar + enriquecer con el servidor
+    // 2. Alertas de stock bajo mínimo (siempre desde caches locales)
+    const alertas = await this.contarBajoMinimo(almacenId);
+    resumenLocal.alertasBajoMinimo = alertas;
+
+    // 3. Intentar enriquecer con el registro diario del servidor
     const hayConexion = await this.syncRepository.hayConexion();
     if (!hayConexion) {
       return resumenLocal;
     }
 
     try {
-      // Reconciliación: si una salida se hizo por la web u otro teléfono,
-      // el ledger local se cierra aquí para que el conteo "dentro" baje.
-      await this.movimientoRepository.reconciliarMovimientosActivos(almacenId);
-
-      // Tras reconciliar, recalcular el local (pudo cambiar)
-      const localTrasReconciliar = await this.movimientoRepository.obtenerResumenLocal(almacenId);
-
-      // Resumen autoritativo del servidor
-      const resumenServidor = await this.movimientoRepository.obtenerResumenAlmacen(almacenId);
-
-      return this.mergeResumen(resumenServidor, localTrasReconciliar);
+      const resumenServidor = await this.movimientoRepository.obtenerRegistroDiario(almacenId);
+      return this.mergeResumen(resumenServidor, resumenLocal);
     } catch (error) {
       // No romper la UI: el ledger local ya es una respuesta válida
       console.warn('[ObtenerResumenAlmacen] Servidor no disponible, usando ledger local:', error);
@@ -53,29 +53,56 @@ export class ObtenerResumenAlmacenUseCase {
   }
 
   /**
+   * Cuenta los productos del almacen cuyo stock cacheado quedó por debajo
+   * del stock mínimo del catálogo.
+   */
+  private async contarBajoMinimo(almacenId: string): Promise<number> {
+    try {
+      const [stockItems, productos] = await Promise.all([
+        this.stockRepository.obtenerStockPorAlmacen(almacenId),
+        this.productoRepository.obtenerProductosLocal(),
+      ]);
+
+      const minimos = new Map(productos.map(p => [p.id, p.stockMinimo]));
+
+      let alertas = 0;
+      for (const item of stockItems) {
+        const minimo = minimos.get(item.productoId);
+        if (minimo !== undefined && item.stock < minimo) {
+          alertas++;
+        }
+      }
+      return alertas;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
    * Merge conservador: cada lado ve los movimientos que el otro puede no ver.
-   * - vehiculosDentro: el máximo de ambos. El server puede no ver las entradas
-   *   pendientes del teléfono; el teléfono puede no ver entradas hechas en la
-   *   web. El mínimo ocultaría una de las dos realidades.
-   * - salieronHoy/ingresosHoy: el server trae el histórico completo del día
-   *   (todas las salidas y cobros, también los hechos en la web); el local
-   *   aporta los pendientes aún no subidos. Como el día avanza los movimientos
-   *   sincronizados están en ambos lados, se usa el mayor y no una suma.
+   * - totalEntradas/totalSalidas: el máximo de ambos. El server puede no ver
+   *   los pendientes del teléfono; el teléfono puede no ver movimientos
+   *   hechos en la web. El mínimo ocultaría una de las dos realidades.
+   * - alertasBajoMinimo: se conserva el valor local (el registro diario del
+   *   API no incluye alertas).
    */
   private mergeResumen(servidor: ResumenAlmacen, local: ResumenAlmacen): ResumenAlmacen {
     return {
-      vehiculosDentro: Math.max(servidor.vehiculosDentro, local.vehiculosDentro),
-      vehiculosSalieronHoy: Math.max(servidor.vehiculosSalieronHoy, local.vehiculosSalieronHoy),
-      ingresosHoy: Math.max(servidor.ingresosHoy, local.ingresosHoy),
-      detallePorTipo: this.mergeDetalle(servidor.detallePorTipo, local.detallePorTipo),
+      totalEntradas: Math.max(servidor.totalEntradas || 0, local.totalEntradas || 0),
+      totalSalidas: Math.max(servidor.totalSalidas || 0, local.totalSalidas || 0),
+      detalleCategorias: this.mergeDetalle(
+        servidor.detalleCategorias || [],
+        local.detalleCategorias || []
+      ),
+      alertasBajoMinimo: local.alertasBajoMinimo ?? 0,
     };
   }
 
   private mergeDetalle(
-    servidor: ResumenAlmacen['detallePorTipo'],
-    local: ResumenAlmacen['detallePorTipo']
-  ): ResumenAlmacen['detallePorTipo'] {
-    const mapa = new Map<string, { categoria: string; cantidad: number; ingreso: number }>();
+    servidor: DetalleCategoria[],
+    local: DetalleCategoria[]
+  ): DetalleCategoria[] {
+    const mapa = new Map<string, DetalleCategoria>();
 
     for (const d of servidor) {
       mapa.set(d.categoria, { ...d });
@@ -83,13 +110,15 @@ export class ObtenerResumenAlmacenUseCase {
     for (const d of local) {
       const existente = mapa.get(d.categoria);
       if (existente) {
-        existente.cantidad = Math.max(existente.cantidad, d.cantidad);
-        existente.ingreso = Math.max(existente.ingreso, d.ingreso);
+        existente.entradas = Math.max(existente.entradas, d.entradas);
+        existente.salidas = Math.max(existente.salidas, d.salidas);
       } else {
         mapa.set(d.categoria, { ...d });
       }
     }
 
-    return Array.from(mapa.values()).sort((a, b) => b.cantidad - a.cantidad);
+    return Array.from(mapa.values()).sort(
+      (a, b) => b.entradas + b.salidas - (a.entradas + a.salidas)
+    );
   }
 }

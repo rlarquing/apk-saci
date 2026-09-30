@@ -9,32 +9,27 @@ import {
   AlmacenAsignado,
   Sesion,
   Movimiento,
-  MovimientoActivo,
-  RegistrarEntradaData,
-  RegistrarSalidaData,
+  RegistrarMovimientoData,
   QR,
   ResultadoEscaneoQR,
-  Precio,
+  Producto,
   Categoria,
   ResumenAlmacen,
-  DetallePorTipo,
+  TipoOperacion,
+  EstadoQR,
 } from '../../domain/entities';
 
 import {
   UsuarioDto,
   RolDto,
   AlmacenDto,
-  MovimientoDto,
-  MovimientoActivoDto,
   QRDto,
   ValidarQRResponseDto,
-  PrecioDto,
+  ProductoDto,
   CategoriaDto,
-  ResumenAlmacenDto,
-  DetallePorTipoDto,
+  RegistroDiarioDto,
   LoginResponseDto,
-  RegistrarEntradaRequestDto,
-  RegistrarSalidaRequestDto,
+  RegistrarMovimientoRequestDto,
 } from '../dtos';
 
 // ==================== USUARIO MAPPER ====================
@@ -47,7 +42,7 @@ export class UsuarioMapper {
       email: dto.email || '',
       activo: dto.activo ?? true,
       roles: (dto.roles || []).map(r => RolMapper.toEntity(r)),
-      almacenesAsignados: (dto.almacenes || []).map(p => AlmacenMapper.toAlmacenAsignado(p)),
+      almacenesAsignados: (dto.almacenes || []).map(a => AlmacenMapper.toAlmacenAsignado(a)),
       createdAt: dto.created_at ? new Date(dto.created_at) : new Date(),
       updatedAt: dto.updated_at ? new Date(dto.updated_at) : new Date(),
     };
@@ -60,7 +55,7 @@ export class UsuarioMapper {
       email: entity.email,
       activo: entity.activo,
       roles: entity.roles?.map(r => RolMapper.toDto(r)),
-      almacenes: entity.almacenesAsignados?.map(p => AlmacenMapper.toDto(p)),
+      almacenes: entity.almacenesAsignados?.map(a => AlmacenMapper.toDto(a)),
     };
   }
 }
@@ -136,109 +131,54 @@ export class SesionMapper {
 // ==================== MOVIMIENTO MAPPER ====================
 
 export class MovimientoMapper {
-  static toEntity(dto: MovimientoDto): Movimiento {
+  /**
+   * Request para POST /api/movimiento-inventario/entrada|salida.
+   * Solo los rezagados offline mandan su fecha real; una operación en vivo
+   * omite el campo y el servidor estampa la hora actual.
+   */
+  static toRegistrarRequest(data: RegistrarMovimientoData): RegistrarMovimientoRequestDto {
     return {
-      id: dto.id,
-      qrCodigo: dto.qr_codigo,
-      almacenId: dto.almacen_id,
-      almacenNombre: dto.almacen_nombre,
-      categoriaId: dto.categoria_id,
-      categoriaNombre: dto.categoria_nombre,
-      precioId: dto.precio_id,
-      precioUnitarioCobrado: dto.precio_unitario_cobrado,
-      fechaEntrada: new Date(dto.fecha_entrada),
-      fechaSalida: dto.fecha_salida ? new Date(dto.fecha_salida) : null,
-      sincronizado: true,
-      createdAt: new Date(dto.created_at),
-      updatedAt: new Date(dto.updated_at),
-    };
-  }
-
-  static toDto(entity: Partial<Movimiento>): Partial<MovimientoDto> {
-    return {
-      id: entity.id,
-      qr_codigo: entity.qrCodigo,
-      almacen_id: entity.almacenId,
-      almacen_nombre: entity.almacenNombre,
-      categoria_id: entity.categoriaId,
-      categoria_nombre: entity.categoriaNombre,
-      precio_id: entity.precioId,
-      precio_unitario_cobrado: entity.precioUnitarioCobrado,
-      fecha_entrada: entity.fechaEntrada?.toISOString(),
-      fecha_salida: entity.fechaSalida?.toISOString() || null,
-    };
-  }
-
-  static toRegistrarEntradaRequest(data: RegistrarEntradaData): RegistrarEntradaRequestDto {
-    return {
-      qrEscaneado: data.qrCodigo,
-      almacen: data.almacenId,
-      // Solo los rezagados offline mandan su fecha real; una entrada en vivo
-      // omite el campo y el servidor estampa la hora actual.
-      ...(data.fechaEntrada ? { fechaEntrada: data.fechaEntrada } : {}),
-    };
-  }
-
-  static toRegistrarSalidaRequest(data: RegistrarSalidaData): RegistrarSalidaRequestDto {
-    return {
-      qrEscaneado: data.qrCodigo,
-      almacen: data.almacenId,
-      // Solo los rezagados offline mandan su fecha real; una salida en vivo
-      // omite el campo y el servidor estampa la hora actual.
-      ...(data.fechaSalida ? { fechaSalida: data.fechaSalida } : {}),
+      ...(data.qrCodigo ? { qrCodigo: data.qrCodigo } : {}),
+      ...(data.productoId ? { productoId: data.productoId } : {}),
+      almacenId: data.almacenId,
+      cantidad: data.cantidad,
+      ...(data.fecha ? { fecha: data.fecha } : {}),
+      ...(data.observaciones ? { observaciones: data.observaciones } : {}),
     };
   }
 
   /**
-   * Construye un Movimiento parcial desde los datos de entrada + el ID que devuelve la API.
-   * La API solo retorna { id, successStatus, message }, no el objeto completo.
+   * Construye un Movimiento desde los datos de la operación + el ID de la
+   * respuesta del API (online) o el id local-... (offline). Los nombres de
+   * producto/categoría se resuelven con las caches locales (QR y productos).
    */
-  static buildFromEntradaResponse(id: string, data: RegistrarEntradaData): Movimiento {
+  static buildFromOperacion(params: {
+    id: string;
+    tipo: TipoOperacion;
+    data: RegistrarMovimientoData;
+    productoNombre: string;
+    productoCodigo: string;
+    categoriaNombre: string;
+    almacenNombre: string;
+    sincronizado: boolean;
+  }): Movimiento {
+    const now = new Date();
     return {
-      id,
-      qrCodigo: data.qrCodigo,
-      almacenId: data.almacenId,
-      almacenNombre: '',
-      categoriaId: data.categoriaId,
-      categoriaNombre: '',
-      precioId: data.precioId,
-      precioUnitarioCobrado: data.precioMonto,
-      fechaEntrada: data.fechaEntrada ? new Date(data.fechaEntrada) : new Date(),
-      fechaSalida: null,
-      sincronizado: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-  }
-
-  static buildFromSalidaResponse(id: string, data: RegistrarSalidaData): Movimiento {
-    return {
-      id,
-      qrCodigo: data.qrCodigo,
-      almacenId: data.almacenId,
-      almacenNombre: '',
-      categoriaId: '',
-      categoriaNombre: '',
-      precioId: '',
-      precioUnitarioCobrado: 0,
-      fechaEntrada: new Date(),
-      fechaSalida: new Date(),
-      sincronizado: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-  }
-}
-
-export class MovimientoActivoMapper {
-  static toEntity(dto: MovimientoActivoDto): MovimientoActivo {
-    return {
-      id: dto.id,
-      fechaEntrada: new Date(dto.fecha_entrada),
-      almacenId: dto.almacen_id,
-      almacenNombre: dto.almacen_nombre,
-      categoriaNombre: dto.categoria_nombre,
-      precioMonto: dto.precio_monto,
+      id: params.id,
+      tipo: params.tipo,
+      qrCodigo: params.data.qrCodigo || null,
+      productoId: params.data.productoId || '',
+      productoNombre: params.productoNombre,
+      productoCodigo: params.productoCodigo,
+      categoriaNombre: params.categoriaNombre,
+      almacenId: params.data.almacenId,
+      almacenNombre: params.almacenNombre,
+      cantidad: params.data.cantidad,
+      fecha: params.data.fecha ? new Date(params.data.fecha) : now,
+      observaciones: params.data.observaciones || null,
+      sincronizado: params.sincronizado,
+      createdAt: now,
+      updatedAt: now,
     };
   }
 }
@@ -250,12 +190,17 @@ export class QRMapper {
     return {
       id: dto.id,
       codigo: dto.codigo,
+      numeroConsecutivo: dto.numeroConsecutivo ?? 0,
+      productoId: dto.producto_id,
+      productoNombre: dto.producto_nombre,
+      productoCodigo: dto.producto_codigo,
+      almacenId: dto.almacen_id,
+      almacenNombre: dto.almacen_nombre,
       loteId: dto.lote_id,
-      loteNombre: dto.lote_nombre,
+      estado: (dto.estado as EstadoQR) || 'disponible',
       activo: dto.activo,
-      categoriaId: dto.categoria_id,
-      categoriaNombre: dto.categoria_nombre,
-      createdAt: new Date(dto.created_at),
+      fechaGeneracion: dto.created_at ? new Date(dto.created_at) : null,
+      createdAt: dto.created_at ? new Date(dto.created_at) : new Date(),
     };
   }
 
@@ -263,11 +208,15 @@ export class QRMapper {
     return {
       id: entity.id,
       codigo: entity.codigo,
+      numeroConsecutivo: entity.numeroConsecutivo,
+      producto_id: entity.productoId,
+      producto_nombre: entity.productoNombre,
+      producto_codigo: entity.productoCodigo,
+      almacen_id: entity.almacenId,
+      almacen_nombre: entity.almacenNombre,
       lote_id: entity.loteId,
-      lote_nombre: entity.loteNombre,
+      estado: entity.estado,
       activo: entity.activo,
-      categoria_id: entity.categoriaId,
-      categoria_nombre: entity.categoriaNombre,
       created_at: entity.createdAt.toISOString(),
     };
   }
@@ -279,50 +228,49 @@ export class ValidarQRMapper {
       valido: dto.valido,
       qr: dto.qr ? QRMapper.toEntity(dto.qr) : null,
       mensaje: dto.mensaje,
-      puedeEntrar: dto.puede_entrar,
-      puedeSalir: dto.puede_salir,
-      movimientoActivo: dto.movimiento_activo 
-        ? MovimientoActivoMapper.toEntity(dto.movimiento_activo) 
-        : null,
+      puedeEntrar: dto.puede_entrada,
+      puedeSalir: dto.puede_salida,
     };
   }
 }
 
-// ==================== PRECIO MAPPER ====================
+// ==================== PRODUCTO MAPPER ====================
 
-export class PrecioMapper {
-  static toEntity(dto: PrecioDto): Precio {
+export class ProductoMapper {
+  static toEntity(dto: ProductoDto): Producto {
     return {
       id: dto.id,
-      monto: dto.monto,
-      categoriaId: dto.categoria_id,
-      categoriaNombre: dto.categoria_nombre,
-      almacenId: dto.almacen_id,
+      codigo: dto.codigo,
+      nombre: dto.nombre,
+      descripcion: dto.descripcion ?? null,
+      categoriaId: dto.categoriaId ?? null,
+      categoriaNombre: dto.categoriaNombre ?? null,
+      unidadNombre: dto.unidadNombre ?? null,
+      stockMinimo: dto.stockMinimo ?? 0,
       activo: dto.activo,
-      fechaVigenciaInicio: new Date(dto.fecha_vigencia_inicio),
-      fechaVigenciaFin: dto.fecha_vigencia_fin ? new Date(dto.fecha_vigencia_fin) : null,
-      createdAt: new Date(dto.created_at),
-      updatedAt: new Date(dto.updated_at),
+      createdAt: dto.createdAt ? new Date(dto.createdAt) : new Date(),
+      updatedAt: dto.updatedAt ? new Date(dto.updatedAt) : new Date(),
     };
   }
 
-  static toDto(entity: Precio): PrecioDto {
+  static toDto(entity: Producto): ProductoDto {
     return {
       id: entity.id,
-      monto: entity.monto,
-      categoria_id: entity.categoriaId,
-      categoria_nombre: entity.categoriaNombre,
-      almacen_id: entity.almacenId,
+      codigo: entity.codigo,
+      nombre: entity.nombre,
+      descripcion: entity.descripcion,
+      categoriaId: entity.categoriaId,
+      categoriaNombre: entity.categoriaNombre,
+      unidadNombre: entity.unidadNombre,
+      stockMinimo: entity.stockMinimo,
       activo: entity.activo,
-      fecha_vigencia_inicio: entity.fechaVigenciaInicio.toISOString(),
-      fecha_vigencia_fin: entity.fechaVigenciaFin?.toISOString() || null,
-      created_at: entity.createdAt.toISOString(),
-      updated_at: entity.updatedAt.toISOString(),
+      createdAt: entity.createdAt.toISOString(),
+      updatedAt: entity.updatedAt.toISOString(),
     };
   }
 }
 
-// ==================== TIPO MEDIO MAPPER ====================
+// ==================== CATEGORIA MAPPER ====================
 
 export class CategoriaMapper {
   static toEntity(dto: CategoriaDto): Categoria {
@@ -331,35 +279,23 @@ export class CategoriaMapper {
       nombre: dto.nombre,
       descripcion: dto.descripcion,
       activo: dto.activo,
-      createdAt: new Date(dto.created_at),
-      updatedAt: new Date(dto.updated_at),
-    };
-  }
-
-  static toDto(entity: Categoria): CategoriaDto {
-    return {
-      id: entity.id,
-      nombre: entity.nombre,
-      descripcion: entity.descripcion,
-      activo: entity.activo,
-      created_at: entity.createdAt.toISOString(),
-      updated_at: entity.updatedAt.toISOString(),
+      createdAt: dto.created_at ? new Date(dto.created_at) : new Date(),
+      updatedAt: dto.updated_at ? new Date(dto.updated_at) : new Date(),
     };
   }
 }
 
-// ==================== RESUMEN PARQUEO MAPPER ====================
+// ==================== REGISTRO DIARIO MAPPER ====================
 
-export class ResumenAlmacenMapper {
-  static toEntity(dto: ResumenAlmacenDto): ResumenAlmacen {
+export class RegistroDiarioMapper {
+  static toEntity(dto: RegistroDiarioDto): ResumenAlmacen {
     return {
-      vehiculosDentro: dto.vehiculosDentro,
-      vehiculosSalieronHoy: dto.vehiculosSalieronHoy,
-      ingresosHoy: dto.ingresosHoy,
-      detallePorTipo: (dto.detallePorTipo || []).map((d: DetallePorTipoDto): DetallePorTipo => ({
+      totalEntradas: dto.totalEntradas ?? 0,
+      totalSalidas: dto.totalSalidas ?? 0,
+      detalleCategorias: (dto.detalleCategorias || []).map(d => ({
         categoria: d.categoria,
-        cantidad: d.cantidad,
-        ingreso: d.ingreso,
+        entradas: d.entradas ?? 0,
+        salidas: d.salidas ?? 0,
       })),
     };
   }

@@ -1,8 +1,7 @@
 /**
  * Presentation Hooks - Exports
  */
-export * from './useParkingOperation';
+export * from './useOperacionInventario';
 export * from './useSync';
 export * from './useResumenAlmacen';
-export * from './usePrecios';
 export * from './useNetwork';

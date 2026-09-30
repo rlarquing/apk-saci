@@ -3,7 +3,7 @@
  * Sincroniza almacenes con el servidor y purga cache local
  */
 import { AlmacenRepository } from '@/src/domain';
-import { Almacen, ResumenAlmacen } from '@/src/domain';
+import { Almacen } from '@/src/domain';
 import { AlmacenLocalDataSource } from '@/src/data/datasources/local/AlmacenLocalDataSource';
 import { AlmacenRemoteDataSource } from '@/src/data/datasources/remote/AlmacenRemoteDataSource';
 import { networkService } from '@/src/infrastructure';
@@ -25,11 +25,6 @@ export class AlmacenRepositoryImpl implements AlmacenRepository {
 
     // Si no está en cache, no hay fallback remoto directo por ID
     return null;
-  }
-
-  async obtenerResumenAlmacen(almacenId: string): Promise<ResumenAlmacen> {
-    // El resumen se obtiene a través del MovimientoRepository
-    throw new Error('Use MovimientoRepository.obtenerResumenAlmacen() en su lugar');
   }
 
   async guardarAlmacenesLocal(almacenes: Almacen[]): Promise<void> {
@@ -59,7 +54,7 @@ export class AlmacenRepositoryImpl implements AlmacenRepository {
 
       while (hasMore) {
         const result = await this.remoteDataSource.obtenerAlmacenes(page, limit);
-        
+
         if (result.items.length === 0) {
           hasMore = false;
           break;

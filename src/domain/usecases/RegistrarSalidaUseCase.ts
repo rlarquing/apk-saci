@@ -1,91 +1,121 @@
 /**
  * Use Case: RegistrarSalidaUseCase
- * Maneja el registro de salidas con soporte offline
- * Campos alineados con la API (api-saci)
+ * Registra una SALIDA de producto con soporte offline.
+ *
+ * Reglas:
+ * 1. La etiqueta debe estar 'asignado' (puedeSalir); si está disponible, no
+ *    hay stock asociado que retirar.
+ * 2. Validación previa de stock con el cache local: si el stock conocido del
+ *    producto en el almacen es menor que la cantidad solicitada, se rechaza
+ *    antes de llamar al API (que además lo valida como 409 "Stock insuficiente").
+ * 3. El stock en inventario NUNCA puede quedar negativo (regla del API).
  */
 import { MovimientoRepository } from '@/src/domain';
 import { QRRepository } from '@/src/domain';
-import { SyncRepository } from '@/src/domain';
-import { 
-  RegistrarSalidaData, 
-  ResultadoOperacion 
-} from '../entities';
+import { ProductoRepository } from '@/src/domain';
+import { StockRepository } from '@/src/domain';
+import { ResultadoOperacion } from '../entities';
+import { esCodigoSKU } from './RegistrarEntradaUseCase';
 
 export class RegistrarSalidaUseCase {
   constructor(
     private movimientoRepository: MovimientoRepository,
     private qrRepository: QRRepository,
-    private syncRepository: SyncRepository
+    private productoRepository: ProductoRepository,
+    private stockRepository: StockRepository
   ) {}
 
   async execute(
-    qrCodigo: string,
+    codigo: string,
     almacenId: string,
-    usuarioId: string
+    cantidad: number,
+    observaciones?: string
   ): Promise<ResultadoOperacion> {
-    // 1. Validar el QR
-    const resultadoQR = await this.qrRepository.validarQR(qrCodigo, almacenId);
-    
-    if (!resultadoQR.valido) {
+    if (!almacenId) {
       return {
         exito: false,
         movimiento: null,
-        mensaje: resultadoQR.mensaje,
+        mensaje: 'No hay almacen seleccionado',
         tipo: 'salida',
       };
     }
 
-    if (!resultadoQR.puedeSalir) {
+    if (!(cantidad > 0)) {
       return {
         exito: false,
         movimiento: null,
-        mensaje: resultadoQR.mensaje || 'Este vehículo no tiene una entrada activa en el almacen',
+        mensaje: 'La cantidad debe ser mayor que cero',
         tipo: 'salida',
       };
     }
 
-    // 2. Obtener el movimiento activo. Sin conexión la validación del QR no
-    // puede devolverlo, así que se busca en el cache local: la entrada
-    // (online u offline) siempre guarda el movimiento en el ledger del
-    // teléfono con su id (real si fue online, local-... si está pendiente).
-    let movimientoActivo = resultadoQR.movimientoActivo;
-    if (!movimientoActivo) {
-      const local = await this.movimientoRepository.obtenerMovimientoActivoPorQR(
-        qrCodigo,
-        almacenId
-      );
-      if (local) {
-        movimientoActivo = {
-          id: local.id,
-          fechaEntrada: new Date(local.fechaEntrada),
-          almacenId: local.almacenId,
-          almacenNombre: local.almacenNombre,
-          categoriaNombre: local.categoriaNombre,
-          precioMonto: local.precioUnitarioCobrado,
+    const codigoLimpio = codigo.trim();
+
+    let qrCodigo: string | undefined;
+    let productoId: string | undefined;
+
+    if (esCodigoSKU(codigoLimpio)) {
+      // Modo manual por SKU
+      const producto = await this.productoRepository.buscarPorCodigo(codigoLimpio.toUpperCase());
+      if (!producto) {
+        return {
+          exito: false,
+          movimiento: null,
+          mensaje:
+            'Producto no encontrado en la caché local. Sincronice la aplicación e intente de nuevo.',
+          tipo: 'salida',
+        };
+      }
+      productoId = producto.id;
+    } else {
+      // Modo etiqueta QR
+      const resultadoQR = await this.qrRepository.validarQR(codigoLimpio, almacenId);
+
+      if (!resultadoQR.valido) {
+        return {
+          exito: false,
+          movimiento: null,
+          mensaje: resultadoQR.mensaje,
+          tipo: 'salida',
+        };
+      }
+
+      if (!resultadoQR.puedeSalir) {
+        return {
+          exito: false,
+          movimiento: null,
+          mensaje:
+            'La etiqueta no tiene producto asignado (estado: disponible). Registre primero una entrada.',
+          tipo: 'salida',
+        };
+      }
+
+      qrCodigo = resultadoQR.qr?.codigo;
+      productoId = resultadoQR.qr?.productoId || undefined;
+    }
+
+    // Validación previa de stock con el cache local. Solo se bloquea cuando
+    // hay un dato conocido: sin dato (null) el API resolverá con el kardex real.
+    if (productoId) {
+      const stock = await this.stockRepository.obtenerStock(productoId, almacenId);
+      if (stock !== null && cantidad > stock) {
+        return {
+          exito: false,
+          movimiento: null,
+          mensaje: `Stock insuficiente: disponible ${stock}, solicitado ${cantidad}`,
+          tipo: 'salida',
         };
       }
     }
 
-    if (!movimientoActivo) {
-      return {
-        exito: false,
-        movimiento: null,
-        mensaje: 'No se encontró movimiento activo para este QR',
-        tipo: 'salida',
-      };
-    }
-
-    // 3. Preparar datos de salida
-    const data: RegistrarSalidaData = {
-      movimientoId: movimientoActivo.id,
+    const resultado = await this.movimientoRepository.registrarSalida({
       qrCodigo,
+      productoId,
       almacenId,
-    };
+      cantidad,
+      observaciones,
+    });
 
-    // 4. Registrar. Si la entrada vino de una operación offline aún no
-    //    sincronizada (id local-...), el repository encola la salida offline
-    //    y el SincronizarUseCase la resuelve en orden: primero crea la entrada
-    //    en el server, reemplaza el id local por el real y luego cierra.
-    return await this.movimientoRepository.registrarSalida(data);
+    return resultado;
   }
 }

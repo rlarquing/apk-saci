@@ -13,36 +13,12 @@ export function formatDate(date: Date | string): string {
 }
 
 /**
- * Formatea duración en minutos a string legible
+ * Formatea una cantidad de unidades (hasta 2 decimales, sin ceros de más)
  */
-export function formatDuration(minutes: number): string {
-  if (minutes < 60) {
-    return `${Math.round(minutes)} min`;
-  }
-  
-  const hours = Math.floor(minutes / 60);
-  const mins = Math.round(minutes % 60);
-  
-  if (hours < 24) {
-    return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
-  }
-  
-  const days = Math.floor(hours / 24);
-  const remainingHours = hours % 24;
-  
-  return remainingHours > 0 
-    ? `${days}d ${remainingHours}h` 
-    : `${days}d`;
-}
-
-/**
- * Formatea monto a moneda
- */
-export function formatCurrency(amount: number): string {
+export function formatCantidad(cantidad: number): string {
   return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
+    maximumFractionDigits: 2,
+  }).format(cantidad);
 }
 
 /**
@@ -58,24 +34,18 @@ export function isValidUrl(url: string): boolean {
 }
 
 /**
- * Parsea datos del QR
+ * Extrae el código de etiqueta de un QR escaneado.
+ * El contenido puede ser un JSON con {codigo} (formato del generador de
+ * etiquetas del API) o el código en texto plano (QR-XXXXXX / PRD-XXXXXX).
  */
-export function parseQRData(data: string): { id?: string; plate?: string; type?: string } | null {
+export function parseQRData(data: string): { codigo: string } {
   try {
-    // Intentar parsear como JSON
     const parsed = JSON.parse(data);
-    return {
-      id: parsed.id || parsed.vehicleId || parsed.vehiculo_id,
-      plate: parsed.plate || parsed.placa,
-      type: parsed.type || parsed.tipo,
-    };
-  } catch {
-    // Si no es JSON, asumir que es un ID o placa
-    if (data.length <= 10 && /^[A-Z0-9-]+$/i.test(data)) {
-      // Parece una placa
-      return { plate: data.toUpperCase() };
+    if (parsed && typeof parsed.codigo === 'string') {
+      return { codigo: parsed.codigo };
     }
-    // Asumir que es un ID
-    return { id: data };
+  } catch {
+    // No es JSON: usar el texto crudo
   }
+  return { codigo: data.trim() };
 }

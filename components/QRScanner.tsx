@@ -114,7 +114,7 @@ export function QRScanner({
         {/* Indicador de operación */}
         <View style={styles.operationIndicator}>
           <MaterialCommunityIcons
-            name={operationType === 'entrada' ? 'car-side' : 'car-back'}
+            name={operationType === 'entrada' ? 'package-variant' : 'package-variant-closed'}
             size={22}
             color={COLORS.white}
           />
@@ -131,7 +131,7 @@ export function QRScanner({
             color={COLORS.white}
           />
           <Text style={styles.instructions}>
-            {isLoading ? 'Procesando...' : 'Escanea el código QR del vehículo'}
+            {isLoading ? 'Procesando...' : 'Escanea el código QR de la etiqueta del producto'}
           </Text>
         </View>
       </View>

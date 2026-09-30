@@ -1,32 +1,40 @@
 /**
  * Repository Interface: QRRepository
- * Define las operaciones de códigos QR
+ * Define las operaciones de etiquetas QR reutilizables
  */
-import { QR, ResultadoEscaneoQR } from '../entities';
+import { QR, ResultadoEscaneoQR, EstadoQR } from '../entities';
 
 export interface QRRepository {
   /**
-   * Valida un código QR contra el servidor
+   * Valida un código QR contra el servidor (con fallback offline al cache)
    */
   validarQR(codigo: string, almacenId: string): Promise<ResultadoEscaneoQR>;
 
   /**
-   * Guarda QRs localmente para uso offline
+   * Guarda etiquetas localmente para uso offline
    */
   guardarQRsLocal(qrs: QR[]): Promise<void>;
 
   /**
-   * Obtiene QRs guardados localmente
+   * Obtiene etiquetas guardadas localmente
    */
   obtenerQRsLocal(): Promise<QR[]>;
 
   /**
-   * Busca un QR en el cache local
+   * Busca una etiqueta en el cache local
    */
   buscarQRLocal(codigo: string): Promise<QR | null>;
 
   /**
-   * Sincroniza QRs desde el servidor
+   * Actualiza el estado de una etiqueta en el cache local.
+   * Se usa tras una entrada exitosa (disponible → asignado) para que las
+   * validaciones offline del escáner reflejen el nuevo estado sin esperar
+   * a la próxima sincronización.
    */
-  sincronizarQRs(almacenId: string): Promise<number>;
+  actualizarEstadoLocal(codigo: string, estado: EstadoQR): Promise<void>;
+
+  /**
+   * Sincroniza etiquetas desde el servidor (purge + replace)
+   */
+  sincronizarQRs(): Promise<number>;
 }

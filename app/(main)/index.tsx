@@ -1,7 +1,7 @@
 /**
  * Pantalla Principal
  * Usa Clean Architecture con hooks de presentación
- * Incluye: cambio de almacen sin logout, auto-sync al recuperar conexión
+ * Incluye: cambio de almacén sin logout, auto-sync al recuperar conexión
  * Acciones en header en vez de botones flotantes
  */
 import React, { useState, useEffect } from 'react';
@@ -12,7 +12,6 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
   Alert,
   AlertButton,
 } from 'react-native';
@@ -33,13 +32,13 @@ export default function MainScreen() {
   const { resumen, isLoading, refresh: refreshResumen } = useResumenAlmacen();
   const { sync, isSyncing, getPendingCount, progress, progressMessage } = useSync();
   const { isServerReachable, checkConnection } = useNetwork();
-  
+
   const [refreshing, setRefreshing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
   /**
    * Marca la bandera de "primera sincronización" solo si la base local
-   * quedó poblada con QRs. Si el servidor falló, la bandera sigue false
+   * quedó poblada con etiquetas. Si el servidor falló, la bandera sigue false
    * y se reintenta en el próximo foco o reconexión.
    */
   const maybeMarkFirstSyncDone = async () => {
@@ -66,7 +65,7 @@ export default function MainScreen() {
 
   /**
    * Primera sincronización tras login online: pobla la base local
-   * (QRs, precios, almacenes, tipos de medio) para uso sin conexión.
+   * (etiquetas, productos, stock, categorías, almacenes) para uso sin conexión.
    */
   const maybeFirstSync = async () => {
     try {
@@ -101,7 +100,7 @@ export default function MainScreen() {
   }, []);
 
   // Recargar resumen y pendientes cuando la pantalla toma foco
-  // (al volver del escáner la entrada/salida ya está registrada en la API)
+  // (al volver del escáner el movimiento ya está en el ledger local)
   useFocusEffect(
     React.useCallback(() => {
       loadPendingCount();
@@ -193,18 +192,15 @@ export default function MainScreen() {
 
   const handleSwitchAlmacen = () => {
     if (!sesion?.usuario?.almacenesAsignados) return;
-    
+
     const almacenes = sesion.usuario.almacenesAsignados;
-    
+
     if (almacenes.length <= 1) return;
 
-    // Mostrar selector de almacen como ActionSheet/Alert
-    const options = almacenes.map(p => p.nombre);
-    options.push('Cancelar');
-
+    // Mostrar selector de almacén como ActionSheet/Alert
     Alert.alert(
-      'Cambiar Almacen',
-      'Seleccione el almacen donde trabajará:',
+      'Cambiar Almacén',
+      'Seleccione el almacén donde trabajará:',
       almacenes.map<AlertButton>(p => ({
         text: p.nombre,
         onPress: async () => {
@@ -212,7 +208,7 @@ export default function MainScreen() {
             await cambiarAlmacen(p.id);
             refreshResumen();
           } catch (error: any) {
-            Alert.alert('Error', error.message || 'No se pudo cambiar el almacen');
+            Alert.alert('Error', error.message || 'No se pudo cambiar el almacén');
           }
         },
       })).concat([{
@@ -248,18 +244,18 @@ export default function MainScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />
         }
       >
-        {/* Header con almacen seleccionado */}
+        {/* Header con almacén seleccionado */}
         <View style={styles.header}>
           <Text style={styles.subtitle}>Sistema Automatizado de Control de Inventarios</Text>
-          
-          {/* Almacen seleccionado - clickeable si hay múltiples */}
+
+          {/* Almacén seleccionado - clickeable si hay múltiples */}
           {sesion?.almacenSeleccionado && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.almacenBadge}
               onPress={hasMultipleAlmacenes ? handleSwitchAlmacen : undefined}
               activeOpacity={hasMultipleAlmacenes ? 0.7 : 1}
             >
-              <MaterialCommunityIcons name="map-marker" size={16} color={COLORS.white} />
+              <MaterialCommunityIcons name="warehouse" size={16} color={COLORS.white} />
               <Text style={styles.almacenText}>{sesion.almacenSeleccionado.nombre}</Text>
               {hasMultipleAlmacenes && (
                 <MaterialCommunityIcons name="swap-horizontal" size={16} color={COLORS.white} />
@@ -283,35 +279,35 @@ export default function MainScreen() {
         {/* Resumen del día */}
         {resumen && (
           <View style={styles.resumenContainer}>
-            <Text style={styles.resumenTitle}>Resumen del Almacen</Text>
-            
+            <Text style={styles.resumenTitle}>Resumen del Día</Text>
+
             <View style={styles.statsGrid}>
               <View style={styles.statCard}>
-                <MaterialCommunityIcons name="car-side" size={24} color={COLORS.accent} />
-                <Text style={styles.statValue}>{resumen.vehiculosDentro}</Text>
-                <Text style={styles.statLabel}>Vehículos Dentro</Text>
+                <MaterialCommunityIcons name="arrow-down-box" size={24} color={COLORS.success} />
+                <Text style={styles.statValue}>{resumen.totalEntradas}</Text>
+                <Text style={styles.statLabel}>Entradas Hoy (uds)</Text>
               </View>
               <View style={styles.statCard}>
-                <MaterialCommunityIcons name="car-arrow-right" size={24} color={COLORS.success} />
-                <Text style={styles.statValue}>{resumen.vehiculosSalieronHoy}</Text>
-                <Text style={styles.statLabel}>Salieron Hoy</Text>
+                <MaterialCommunityIcons name="arrow-up-box" size={24} color={COLORS.error} />
+                <Text style={styles.statValue}>{resumen.totalSalidas}</Text>
+                <Text style={styles.statLabel}>Salidas Hoy (uds)</Text>
               </View>
               <View style={styles.statCard}>
-                <MaterialCommunityIcons name="cash-multiple" size={24} color={COLORS.warning} />
-                <Text style={styles.statValue}>${resumen.ingresosHoy.toFixed(2)}</Text>
-                <Text style={styles.statLabel}>Ingresos Hoy</Text>
+                <MaterialCommunityIcons name="alert" size={24} color={COLORS.warning} />
+                <Text style={styles.statValue}>{resumen.alertasBajoMinimo ?? 0}</Text>
+                <Text style={styles.statLabel}>Bajo Mínimo</Text>
               </View>
             </View>
 
-            {/* Detalle por tipo de medio */}
-            {resumen.detallePorTipo && resumen.detallePorTipo.length > 0 && (
+            {/* Detalle por categoría */}
+            {resumen.detalleCategorias && resumen.detalleCategorias.length > 0 && (
               <View style={styles.detalleContainer}>
-                <Text style={styles.detalleTitle}>Detalle por Tipo</Text>
-                {resumen.detallePorTipo.map((detalle, index) => (
+                <Text style={styles.detalleTitle}>Detalle por Categoría (uds)</Text>
+                {resumen.detalleCategorias.map((detalle, index) => (
                   <View key={index} style={styles.detalleRow}>
-                    <Text style={styles.detalleTipo}>{detalle.categoria}</Text>
-                    <Text style={styles.detalleCantidad}>{detalle.cantidad} uds</Text>
-                    <Text style={styles.detalleIngreso}>${detalle.ingreso.toFixed(2)}</Text>
+                    <Text style={styles.detalleCategoria}>{detalle.categoria}</Text>
+                    <Text style={styles.detalleEntradas}>+{detalle.entradas}</Text>
+                    <Text style={styles.detalleSalidas}>-{detalle.salidas}</Text>
                   </View>
                 ))}
               </View>
@@ -324,7 +320,7 @@ export default function MainScreen() {
           <TouchableOpacity style={styles.syncBanner} onPress={handleSync} disabled={isSyncing}>
             <MaterialCommunityIcons name="alert" size={20} color={COLORS.white} />
             <Text style={styles.syncBannerText}>
-              {pendingCount} operaciones pendientes de sincronizar
+              {pendingCount} movimientos pendientes de sincronizar
             </Text>
             <Text style={styles.syncBannerAction}>
               {isSyncing ? 'Sincronizando...' : 'Tocar para sincronizar'}
@@ -340,11 +336,11 @@ export default function MainScreen() {
           </View>
         )}
 
-        {/* Cambio de almacen - info para usuarios con múltiples */}
+        {/* Cambio de almacén - info para usuarios con múltiples */}
         {hasMultipleAlmacenes && (
           <TouchableOpacity style={styles.switchAlmacenBanner} onPress={handleSwitchAlmacen}>
             <MaterialCommunityIcons name="swap-horizontal" size={20} color={COLORS.accent} />
-            <Text style={styles.switchAlmacenText}>Toca el almacen o aquí para cambiar de almacen</Text>
+            <Text style={styles.switchAlmacenText}>Toca el almacén o aquí para cambiar de almacén</Text>
           </TouchableOpacity>
         )}
 
@@ -352,7 +348,8 @@ export default function MainScreen() {
         <View style={styles.instructions}>
           <MaterialCommunityIcons name="information" size={20} color={COLORS.accent} />
           <Text style={styles.instructionText}>
-            Seleccione la operación que desea realizar y escanee el código QR del vehículo
+            Seleccione la operación y escanee el código QR de la etiqueta del producto
+            (o ingrese el SKU PRD-XXXXXX)
           </Text>
         </View>
 
@@ -362,18 +359,18 @@ export default function MainScreen() {
             style={[styles.operationButton, styles.entryButton]}
             onPress={() => handleOperationSelect('entrada')}
           >
-            <MaterialCommunityIcons name="car-side" size={40} color={COLORS.success} />
+            <MaterialCommunityIcons name="package-variant" size={40} color={COLORS.success} />
             <Text style={styles.operationTitle}>ENTRADA</Text>
-            <Text style={styles.operationSubtitle}>Registrar ingreso de vehículo</Text>
+            <Text style={styles.operationSubtitle}>Registrar entrada de producto</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.operationButton, styles.exitButton]}
             onPress={() => handleOperationSelect('salida')}
           >
-            <MaterialCommunityIcons name="car-back" size={40} color={COLORS.error} />
+            <MaterialCommunityIcons name="package-variant-closed" size={40} color={COLORS.error} />
             <Text style={styles.operationTitle}>SALIDA</Text>
-            <Text style={styles.operationSubtitle}>Registrar salida de vehículo</Text>
+            <Text style={styles.operationSubtitle}>Registrar salida de producto</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -491,22 +488,22 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 4,
   },
-  detalleTipo: {
+  detalleCategoria: {
     fontSize: 13,
     color: COLORS.white,
     flex: 1,
   },
-  detalleCantidad: {
+  detalleEntradas: {
     fontSize: 13,
-    color: COLORS.accent,
+    color: COLORS.success,
     textAlign: 'center',
     width: 70,
   },
-  detalleIngreso: {
+  detalleSalidas: {
     fontSize: 13,
-    color: COLORS.success,
+    color: COLORS.error,
     textAlign: 'right',
-    width: 80,
+    width: 70,
   },
   syncBanner: {
     backgroundColor: COLORS.warning,
@@ -546,7 +543,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   switchAlmacenBanner: {
-    backgroundColor: 'rgba(108, 153, 204, 0.2)',
+    backgroundColor: 'rgba(20, 184, 166, 0.2)',
     borderRadius: 10,
     padding: 12,
     marginBottom: 15,

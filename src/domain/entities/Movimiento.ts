@@ -1,56 +1,52 @@
 /**
  * Domain Entity: Movimiento
- * Representa un movimiento de entrada/salida en un almacen
- * Campos alineados con la API (api-saci)
+ * Representa un movimiento de inventario (entrada o salida) en un almacen.
+ * A diferencia de un ticket, cada movimiento es un registro independiente e
+ * inmutable con su cantidad. Campos alineados con la API (api-saci).
  */
 export type TipoOperacion = 'entrada' | 'salida';
 
 export interface Movimiento {
   id: string;
-  qrCodigo: string;
+  tipo: TipoOperacion;
+  /** Código de la etiqueta QR escaneada (null en registro manual por SKU) */
+  qrCodigo: string | null;
+  productoId: string;
+  productoNombre: string;
+  productoCodigo: string;
+  categoriaNombre: string;
   almacenId: string;
   almacenNombre: string;
-  categoriaId: string;
-  categoriaNombre: string;
-  precioId: string;
-  precioUnitarioCobrado: number;
-  fechaEntrada: Date;
-  fechaSalida: Date | null;
+  /** Cantidad de unidades movidas (0.01 - 999999.99) */
+  cantidad: number;
+  fecha: Date;
+  observaciones: string | null;
   sincronizado: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
 /**
- * Datos para registrar una entrada
+ * Datos para registrar un movimiento (entrada o salida).
+ * Shape alineado con CreateEntradaDto/CreateSalidaDto del API:
+ * requiere qrCodigo o productoId, mas almacenId y cantidad.
  */
-export interface RegistrarEntradaData {
-  qrCodigo: string;
+export interface RegistrarMovimientoData {
+  qrCodigo?: string;
+  productoId?: string;
   almacenId: string;
-  categoriaId: string;
-  precioId: string;
-  /** Monto que se cobra al entrar (el precio es fijo, no por tiempo) */
-  precioMonto: number;
+  cantidad: number;
   /**
-   * Fecha real del cobro en ISO. Solo la llevan los pendientes offline: la
-   * entrada en vivo no la manda y el servidor estampa la hora actual.
+   * Fecha real del movimiento en ISO. Solo la llevan los pendientes offline:
+   * la operación en vivo no la manda y el servidor estampa la hora actual.
+   * El API rechaza fechas futuras o de hace más de 7 días.
    */
-  fechaEntrada?: string;
+  fecha?: string;
+  observaciones?: string;
 }
 
 /**
- * Datos para registrar una salida
- */
-export interface RegistrarSalidaData {
-  movimientoId: string;
-  qrCodigo: string;
-  almacenId: string;
-  /** Fecha real de la salida en ISO (solo pendiente offline; opcional) */
-  fechaSalida?: string;
-}
-
-/**
- * Resultado de una operación de almacen
+ * Resultado de una operación de inventario
  */
 export interface ResultadoOperacion {
   exito: boolean;
@@ -65,7 +61,7 @@ export interface ResultadoOperacion {
 export interface MovimientoPendiente {
   idLocal: string;
   operacion: TipoOperacion;
-  data: RegistrarEntradaData | RegistrarSalidaData;
+  data: RegistrarMovimientoData;
   createdAt: Date;
   reintentos: number;
 }

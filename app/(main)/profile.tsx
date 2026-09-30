@@ -42,16 +42,16 @@ export default function ProfileScreen() {
     if (almacenes.length <= 1) return;
 
     Alert.alert(
-      'Cambiar Almacen',
-      'Seleccione el almacen donde trabajará:',
+      'Cambiar Almacén',
+      'Seleccione el almacén donde trabajará:',
       almacenes.map<AlertButton>(p => ({
         text: p.nombre,
         onPress: async () => {
           try {
             await cambiarAlmacen(p.id);
-            Alert.alert('Almacen cambiado', `Ahora trabajando en: ${p.nombre}`);
+            Alert.alert('Almacén cambiado', `Ahora trabajando en: ${p.nombre}`);
           } catch (error: any) {
-            Alert.alert('Error', error.message || 'No se pudo cambiar el almacen');
+            Alert.alert('Error', error.message || 'No se pudo cambiar el almacén');
           }
         },
       })).concat([{
@@ -112,9 +112,9 @@ export default function ProfileScreen() {
           <View style={styles.divider} />
 
           <View style={styles.infoRow}>
-            <MaterialCommunityIcons name="parking" size={20} color={COLORS.accent} />
+            <MaterialCommunityIcons name="warehouse" size={20} color={COLORS.accent} />
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Almacen Actual</Text>
+              <Text style={styles.infoLabel}>Almacén Actual</Text>
               <Text style={styles.infoValue}>
                 {sesion?.almacenSeleccionado?.nombre || 'No seleccionado'}
               </Text>
@@ -135,7 +135,7 @@ export default function ProfileScreen() {
                 <MaterialCommunityIcons name="swap-horizontal" size={22} color={COLORS.white} />
               </View>
               <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>Cambiar Almacen</Text>
+                <Text style={styles.actionTitle}>Cambiar Almacén</Text>
                 <Text style={styles.actionSubtitle}>
                   {sesion?.usuario?.almacenesAsignados?.length || 0} almacenes asignados
                 </Text>

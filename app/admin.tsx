@@ -81,12 +81,13 @@ export default function AdminScreen() {
     try {
       const stats = await serviceContainer.getCacheStats();
       const statList: CacheStat[] = [
-        { key: 'movimientos_cache', label: 'Movimientos (caché)', count: stats.movimientos_cache || 0, icon: 'car-side' },
+        { key: 'movimientos_cache', label: 'Movimientos (caché)', count: stats.movimientos_cache || 0, icon: 'swap-vertical' },
         { key: 'movimientos_pendientes', label: 'Pendientes de sincronizar', count: stats.movimientos_pendientes || 0, icon: 'cloud-upload' },
-        { key: 'qrs_cache', label: 'Códigos QR', count: stats.qrs_cache || 0, icon: 'qrcode' },
-        { key: 'precios_cache', label: 'Precios', count: stats.precios_cache || 0, icon: 'cash-multiple' },
-        { key: 'categorias_cache', label: 'Tipos de Medio', count: stats.categorias_cache || 0, icon: 'car' },
-        { key: 'almacenes_cache', label: 'Almacenes', count: stats.almacenes_cache || 0, icon: 'parking' },
+        { key: 'qrs_cache', label: 'Etiquetas QR', count: stats.qrs_cache || 0, icon: 'qrcode' },
+        { key: 'productos_cache', label: 'Productos', count: stats.productos_cache || 0, icon: 'package-variant' },
+        { key: 'stock_cache', label: 'Stock', count: stats.stock_cache || 0, icon: 'clipboard-list' },
+        { key: 'categorias_cache', label: 'Categorías', count: stats.categorias_cache || 0, icon: 'tag-multiple' },
+        { key: 'almacenes_cache', label: 'Almacenes', count: stats.almacenes_cache || 0, icon: 'warehouse' },
         { key: 'usuarios_offline', label: 'Usuarios Offline', count: stats.usuarios_offline || 0, icon: 'account-lock' },
       ];
       setCacheStats(statList);

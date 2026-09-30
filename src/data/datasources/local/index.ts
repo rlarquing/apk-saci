@@ -3,7 +3,9 @@
  */
 export * from './AuthLocalDataSource';
 export * from './MovimientoLocalDataSource';
-export * from './PrecioLocalDataSource';
 export * from './QRLocalDataSource';
-export * from './ConfigLocalDataSource';
+export * from './ProductoLocalDataSource';
+export * from './StockLocalDataSource';
+export * from './AlmacenLocalDataSource';
 export * from './CategoriaLocalDataSource';
+export * from './ConfigLocalDataSource';

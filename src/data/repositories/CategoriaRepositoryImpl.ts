@@ -1,67 +1,53 @@
 /**
  * Repository Implementation: CategoriaRepository
- * Sincroniza tipos de medio con el servidor y purga cache local
- * Alineado con api-saci CategoriaSyncDto
+ * Sincroniza categorías con el servidor y purga cache local
  */
 import { CategoriaRepository } from '@/src/domain';
-import { Categoria, CategoriaConPrecio } from '@/src/domain';
+import { Categoria } from '@/src/domain';
 import { CategoriaLocalDataSource } from '@/src/data/datasources/local/CategoriaLocalDataSource';
-import { CategoriaSyncDto } from '../dtos';
 
 export class CategoriaRepositoryImpl implements CategoriaRepository {
   constructor(
     private localDataSource: CategoriaLocalDataSource,
   ) {}
 
-  async obtenerTiposMedio(): Promise<Categoria[]> {
+  async obtenerCategorias(): Promise<Categoria[]> {
     return await this.localDataSource.obtenerTiposMedio();
-  }
-
-  async obtenerTiposMedioConPrecio(almacenId: string): Promise<CategoriaConPrecio[]> {
-    // Los tipos de medio con precio se obtienen a través del PrecioRepository
-    const tipos = await this.localDataSource.obtenerTiposMedio();
-    return tipos.map(tipo => ({
-      categoria: tipo,
-      precio: null, // Se llena desde PrecioRepository
-    }));
   }
 
   async obtenerCategoria(id: string): Promise<Categoria | null> {
     return await this.localDataSource.obtenerCategoria(id);
   }
 
-  async guardarTiposMedioLocal(tipos: Categoria[]): Promise<void> {
-    await this.localDataSource.guardarTiposMedio(tipos);
+  async guardarCategoriasLocal(categorias: Categoria[]): Promise<void> {
+    await this.localDataSource.guardarTiposMedio(categorias);
   }
 
-  async obtenerTiposMedioLocal(): Promise<Categoria[]> {
+  async obtenerCategoriasLocal(): Promise<Categoria[]> {
     return await this.localDataSource.obtenerTiposMedio();
   }
 
   /**
-   * Sincroniza tipos de medio: PURGA cache y guarda datos frescos del API
+   * Guarda la lista liviana del select del nomenclador ([{value,label}]).
+   * El endpoint no aporta descripcion ni fechas: se rellenan con null/now.
    */
-  async sincronizarTiposMedio(tiposMedioSync?: CategoriaSyncDto[]): Promise<number> {
-    if (!tiposMedioSync || tiposMedioSync.length === 0) {
+  async guardarDesdeSelect(items: Array<{ value: string; label: string }>): Promise<number> {
+    if (!items || items.length === 0) {
       return 0;
     }
 
-    // PURGAR cache completo antes de insertar
     await this.localDataSource.limpiarTiposMedio();
+    const now = new Date();
+    const categorias: Categoria[] = items.map(item => ({
+      id: item.value,
+      nombre: item.label,
+      descripcion: null,
+      activo: true,
+      createdAt: now,
+      updatedAt: now,
+    }));
 
-    // Filtrar solo activos y mapear a entidad local
-    const tipos: Categoria[] = tiposMedioSync
-      .filter(t => t.activo)
-      .map(t => ({
-        id: t.id,
-        nombre: t.nombre,
-        descripcion: t.descripcion,
-        activo: t.activo,
-        createdAt: new Date(t.createdAt),
-        updatedAt: new Date(t.updatedAt),
-      }));
-
-    await this.localDataSource.guardarTiposMedio(tipos);
-    return tipos.length;
+    await this.localDataSource.guardarTiposMedio(categorias);
+    return categorias.length;
   }
 }

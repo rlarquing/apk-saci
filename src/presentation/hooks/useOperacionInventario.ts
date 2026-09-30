@@ -1,35 +1,38 @@
 /**
- * useParkingOperation - Hook para operaciones de almacen
+ * useOperacionInventario - Hook para operaciones de entrada/salida
  * Usa Clean Architecture con soporte offline-first
  */
 import { useState, useCallback } from 'react';
-import { 
-  Movimiento, 
-  TipoOperacion, 
-  ResultadoOperacion 
+import {
+  TipoOperacion,
+  ResultadoOperacion
 } from '@/src/domain';
 import { serviceContainer } from '@/src/infrastructure/di/ServiceContainer';
 import { useAuth } from '@/src/presentation/contexts/AuthContext';
 
-interface UseParkingOperationReturn {
+interface UseOperacionInventarioReturn {
   isLoading: boolean;
   result: ResultadoOperacion | null;
-  executeOperation: (qrData: string, operation: TipoOperacion, categoriaId?: string) => Promise<void>;
+  /**
+   * Ejecuta la operación sobre un código escaneado (etiqueta QR-XXXXXX) o
+   * tecleado (SKU PRD-XXXXXX), con la cantidad capturada en el modal.
+   */
+  executeOperacion: (codigo: string, operation: TipoOperacion, cantidad: number) => Promise<void>;
   reset: () => void;
 }
 
-export function useParkingOperation(): UseParkingOperationReturn {
+export function useOperacionInventario(): UseOperacionInventarioReturn {
   const { sesion } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ResultadoOperacion | null>(null);
 
-  const executeOperation = useCallback(
-    async (qrData: string, operation: TipoOperacion, categoriaId?: string) => {
+  const executeOperacion = useCallback(
+    async (codigo: string, operation: TipoOperacion, cantidad: number) => {
       if (!sesion?.almacenSeleccionado || !sesion.usuario) {
         setResult({
           exito: false,
           movimiento: null,
-          mensaje: 'No hay almacen seleccionado',
+          mensaje: 'No hay almacén seleccionado',
           tipo: operation,
         });
         return;
@@ -43,23 +46,22 @@ export function useParkingOperation(): UseParkingOperationReturn {
 
         if (operation === 'entrada') {
           resultado = await serviceContainer.registrarEntrada.execute(
-            qrData,
+            codigo,
             sesion.almacenSeleccionado.id,
-            sesion.usuario.id,
-            categoriaId
+            cantidad
           );
         } else {
           resultado = await serviceContainer.registrarSalida.execute(
-            qrData,
+            codigo,
             sesion.almacenSeleccionado.id,
-            sesion.usuario.id
+            cantidad
           );
         }
 
         setResult(resultado);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-        
+
         setResult({
           exito: false,
           movimiento: null,
@@ -81,7 +83,7 @@ export function useParkingOperation(): UseParkingOperationReturn {
   return {
     isLoading,
     result,
-    executeOperation,
+    executeOperacion,
     reset,
   };
 }

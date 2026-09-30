@@ -62,12 +62,13 @@ export interface CredencialesOffline {
 
 /**
  * Nombres de rol del sistema. Deben coincidir exactamente con RolType
- * del API (api-saci/src/shared/enum/rol-type.enum.ts).
+ * del API (api-saci/src/shared/enum/rol-type.enum.ts):
+ * ADMINISTRADOR, JEFE_DE_ALMACEN y OPERARIO.
  */
 export const ROLES = {
   ADMINISTRADOR: 'ADMINISTRADOR',
   JEFE_DE_ALMACEN: 'JEFE_DE_ALMACEN',
-  USUARIO: 'OPERARIO',
+  OPERARIO: 'OPERARIO',
 } as const;
 
 export const MENSAJE_ACCESO_MOVIL_DENEGADO =
@@ -87,19 +88,21 @@ export class AccesoMovilDenegadoError extends Error {
 /**
  * Regla de acceso a la app móvil.
  *
- * JEFE_DE_ALMACEN es un rol de supervisión y no opera en campo, por lo que
- * se le niega el acceso. La excepción es que además tenga un rol operativo
- * (USUARIO) o de administración, para no dejar fuera a un usuario con
- * roles combinados.
+ * El móvil es la herramienta de los almacenes: OPERARIO escanea entradas y
+ * salidas, JEFE_DE_ALMACEN supervisa y ADMINISTRADOR tiene acceso completo.
+ * Un usuario sin ninguno de estos roles (solo perfiles administrativos de la
+ * web) no puede operar en campo.
  *
- * Nota: esta es una regla de la app. El API sí autoriza a JEFE_DE_ALMACEN
- * en los endpoints de movimiento (@Roles en movimiento.controller.ts).
+ * Nota: esta es una regla de la app. El API además aplica @Roles y scoping
+ * por almacén en cada endpoint.
  */
 export function puedeOperarEnMovil(usuario: Usuario | null | undefined): boolean {
   const roles = usuario?.roles?.map(r => r.nombre) ?? [];
-  const esJefe = roles.includes(ROLES.JEFE_DE_ALMACEN);
-  const tieneRolOperativo =
-    roles.includes(ROLES.USUARIO) || roles.includes(ROLES.ADMINISTRADOR);
+  const rolesPermitidos: string[] = [
+    ROLES.ADMINISTRADOR,
+    ROLES.JEFE_DE_ALMACEN,
+    ROLES.OPERARIO,
+  ];
 
-  return !esJefe || tieneRolOperativo;
+  return roles.some(rol => rolesPermitidos.includes(rol));
 }

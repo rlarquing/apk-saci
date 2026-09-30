@@ -9,13 +9,13 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.saci.parking",
+      "bundleIdentifier": "com.saci.inventario",
       "infoPlist": {
-        "NSCameraUsageDescription": "Esta aplicación necesita acceso a la cámara para escanear códigos QR de los vehículos."
+        "NSCameraUsageDescription": "Esta aplicación necesita acceso a la cámara para escanear los códigos QR de las etiquetas de los productos."
       }
     },
     "android": {
-      "package": "com.saci.parking",
+      "package": "com.saci.inventario",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
@@ -33,7 +33,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Esta aplicación necesita acceso a la cámara para escanear códigos QR de los vehículos."
+          "cameraPermission": "Esta aplicación necesita acceso a la cámara para escanear los códigos QR de las etiquetas de los productos."
         }
       ],
       [

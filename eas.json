@@ -13,7 +13,7 @@
         "credentialsSource": "local",
         "buildType": "apk",
         "env": {
-          "EXPO_PUBLIC_API_URL": "http://srv895496.hstgr.cloud:3003"
+          "EXPO_PUBLIC_API_URL": "http://TU-SERVIDOR-SACI:3000/api"
         }
       }
     },
@@ -21,7 +21,7 @@
       "android": {
         "buildType": "app-bundle",
         "env": {
-          "EXPO_PUBLIC_API_URL": "http://srv895496.hstgr.cloud:3003"
+          "EXPO_PUBLIC_API_URL": "http://TU-SERVIDOR-SACI:3000/api"
         }
       }
     }

@@ -1,6 +1,6 @@
 /**
  * Domain Entity: Almacen
- * Representa un estacionamiento/almacen
+ * Representa un almacen físico del sistema de inventarios
  */
 export interface Almacen {
   id: string;
@@ -12,20 +12,29 @@ export interface Almacen {
 }
 
 /**
- * Resumen del estado de un almacen
- * Alineado con api-saci ResumenAlmacenDto
+ * Detalle de movimientos del día agrupado por categoría
+ * Alineado con DetalleTiposDto del API (registro-diario)
  */
-export interface DetallePorTipo {
+export interface DetalleCategoria {
   categoria: string;
-  cantidad: number;
-  ingreso: number;
+  entradas: number;
+  salidas: number;
 }
 
+/**
+ * Resumen de movimientos del día en un almacen.
+ * Base: GET /api/registro-diario/actual/:almacenId (totalEntradas/totalSalidas/
+ * detalleCategorias). En offline se calcula desde el ledger local y se hace
+ * merge conservador (máximo de cada contador).
+ */
 export interface ResumenAlmacen {
-  vehiculosDentro: number;
-  vehiculosSalieronHoy: number;
-  ingresosHoy: number;
-  detallePorTipo: DetallePorTipo[];
+  totalEntradas: number;
+  totalSalidas: number;
+  detalleCategorias: DetalleCategoria[];
+  /**
+   * Productos con stock por debajo del mínimo (alertas). Solo existe en el
+   * cliente: se calcula desde las caches locales de productos y stock, pues
+   * el registro diario del API no lo trae.
+   */
+  alertasBajoMinimo?: number;
 }
-
-

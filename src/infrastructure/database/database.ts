@@ -50,6 +50,9 @@ async function migrateSchema(): Promise<void> {
       // Eliminar tablas cache que cambiaron (los datos se re-descargan)
       await db.execAsync(`
         DROP TABLE IF EXISTS movimientos_cache;
+        DROP TABLE IF EXISTS qrs_cache;
+        DROP TABLE IF EXISTS productos_cache;
+        DROP TABLE IF EXISTS stock_cache;
         DROP TABLE IF EXISTS almacenes_cache;
         DROP TABLE IF EXISTS categorias_cache;
         DROP TABLE IF EXISTS movimientos_pendientes;
@@ -133,11 +136,13 @@ export async function executeTransaction(
  */
 export async function clearCache(): Promise<void> {
   const database = getDatabase();
-  
+
   await database.withTransactionAsync(async () => {
     await database.runAsync('DELETE FROM movimientos_cache');
+    await database.runAsync('DELETE FROM movimientos_pendientes');
     await database.runAsync('DELETE FROM qrs_cache');
-    await database.runAsync('DELETE FROM precios_cache');
+    await database.runAsync('DELETE FROM productos_cache');
+    await database.runAsync('DELETE FROM stock_cache');
     await database.runAsync('DELETE FROM categorias_cache');
     await database.runAsync('DELETE FROM almacenes_cache');
   });
@@ -149,19 +154,23 @@ export async function clearCache(): Promise<void> {
 export async function getDatabaseStats(): Promise<{
   movimientos: number;
   qrs: number;
-  precios: number;
+  productos: number;
+  stock: number;
   pendientes: number;
 }> {
   const database = getDatabase();
-  
+
   const movimientos = await database.getFirstAsync<{ count: number }>(
     'SELECT COUNT(*) as count FROM movimientos_cache'
   );
   const qrs = await database.getFirstAsync<{ count: number }>(
     'SELECT COUNT(*) as count FROM qrs_cache'
   );
-  const precios = await database.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) as count FROM precios_cache'
+  const productos = await database.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM productos_cache'
+  );
+  const stock = await database.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM stock_cache'
   );
   const pendientes = await database.getFirstAsync<{ count: number }>(
     'SELECT COUNT(*) as count FROM movimientos_pendientes WHERE sincronizado = 0'
@@ -170,7 +179,8 @@ export async function getDatabaseStats(): Promise<{
   return {
     movimientos: movimientos?.count || 0,
     qrs: qrs?.count || 0,
-    precios: precios?.count || 0,
+    productos: productos?.count || 0,
+    stock: stock?.count || 0,
     pendientes: pendientes?.count || 0,
   };
 }

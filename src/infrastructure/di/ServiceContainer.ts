@@ -9,8 +9,9 @@ import { initDatabase, executeQueryFirst, executeUpdate } from '../database/data
 // Local DataSources
 import { AuthLocalDataSource } from '../../data/datasources/local/AuthLocalDataSource';
 import { MovimientoLocalDataSource } from '../../data/datasources/local/MovimientoLocalDataSource';
-import { PrecioLocalDataSource } from '../../data/datasources/local/PrecioLocalDataSource';
 import { QRLocalDataSource } from '../../data/datasources/local/QRLocalDataSource';
+import { ProductoLocalDataSource } from '../../data/datasources/local/ProductoLocalDataSource';
+import { StockLocalDataSource } from '../../data/datasources/local/StockLocalDataSource';
 import { ConfigLocalDataSource } from '../../data/datasources/local/ConfigLocalDataSource';
 import { CategoriaLocalDataSource } from '../../data/datasources/local/CategoriaLocalDataSource';
 import { AlmacenLocalDataSource } from '../../data/datasources/local/AlmacenLocalDataSource';
@@ -19,7 +20,8 @@ import { AlmacenLocalDataSource } from '../../data/datasources/local/AlmacenLoca
 import { AuthRemoteDataSource } from '../../data/datasources/remote/AuthRemoteDataSource';
 import { MovimientoRemoteDataSource } from '../../data/datasources/remote/MovimientoRemoteDataSource';
 import { QRRemoteDataSource } from '../../data/datasources/remote/QRRemoteDataSource';
-import { PrecioRemoteDataSource } from '../../data/datasources/remote/PrecioRemoteDataSource';
+import { ProductoRemoteDataSource } from '../../data/datasources/remote/ProductoRemoteDataSource';
+import { CategoriaRemoteDataSource } from '../../data/datasources/remote/CategoriaRemoteDataSource';
 import { SyncRemoteDataSource } from '../../data/datasources/remote/SyncRemoteDataSource';
 import { AlmacenRemoteDataSource } from '../../data/datasources/remote/AlmacenRemoteDataSource';
 
@@ -27,7 +29,8 @@ import { AlmacenRemoteDataSource } from '../../data/datasources/remote/AlmacenRe
 import { AuthRepositoryImpl } from '../../data/repositories/AuthRepositoryImpl';
 import { MovimientoRepositoryImpl } from '../../data/repositories/MovimientoRepositoryImpl';
 import { QRRepositoryImpl } from '../../data/repositories/QRRepositoryImpl';
-import { PrecioRepositoryImpl } from '../../data/repositories/PrecioRepositoryImpl';
+import { ProductoRepositoryImpl } from '../../data/repositories/ProductoRepositoryImpl';
+import { StockRepositoryImpl } from '../../data/repositories/StockRepositoryImpl';
 import { SyncRepositoryImpl } from '../../data/repositories/SyncRepositoryImpl';
 import { CategoriaRepositoryImpl } from '../../data/repositories/CategoriaRepositoryImpl';
 import { AlmacenRepositoryImpl } from '../../data/repositories/AlmacenRepositoryImpl';
@@ -38,7 +41,6 @@ import { LogoutUseCase } from '../../domain/usecases/LogoutUseCase';
 import { RegistrarEntradaUseCase } from '../../domain/usecases/RegistrarEntradaUseCase';
 import { RegistrarSalidaUseCase } from '../../domain/usecases/RegistrarSalidaUseCase';
 import { SincronizarUseCase } from '../../domain/usecases/SincronizarUseCase';
-import { ObtenerPreciosUseCase } from '../../domain/usecases/ObtenerPreciosUseCase';
 import { ObtenerResumenAlmacenUseCase } from '../../domain/usecases/ObtenerResumenAlmacenUseCase';
 
 // Network
@@ -55,8 +57,9 @@ export class ServiceContainer {
   // Local DataSources
   private authLocalDataSource!: AuthLocalDataSource;
   private movimientoLocalDataSource!: MovimientoLocalDataSource;
-  private precioLocalDataSource!: PrecioLocalDataSource;
   private qrLocalDataSource!: QRLocalDataSource;
+  private productoLocalDataSource!: ProductoLocalDataSource;
+  private stockLocalDataSource!: StockLocalDataSource;
   private configLocalDataSource!: ConfigLocalDataSource;
   private categoriaLocalDataSource!: CategoriaLocalDataSource;
   private almacenLocalDataSource!: AlmacenLocalDataSource;
@@ -65,7 +68,8 @@ export class ServiceContainer {
   private authRemoteDataSource!: AuthRemoteDataSource;
   private movimientoRemoteDataSource!: MovimientoRemoteDataSource;
   private qrRemoteDataSource!: QRRemoteDataSource;
-  private precioRemoteDataSource!: PrecioRemoteDataSource;
+  private productoRemoteDataSource!: ProductoRemoteDataSource;
+  private categoriaRemoteDataSource!: CategoriaRemoteDataSource;
   private syncRemoteDataSource!: SyncRemoteDataSource;
   private almacenRemoteDataSource!: AlmacenRemoteDataSource;
 
@@ -73,7 +77,8 @@ export class ServiceContainer {
   private authRepository!: AuthRepositoryImpl;
   private movimientoRepository!: MovimientoRepositoryImpl;
   private qrRepository!: QRRepositoryImpl;
-  private precioRepository!: PrecioRepositoryImpl;
+  private productoRepository!: ProductoRepositoryImpl;
+  private stockRepository!: StockRepositoryImpl;
   private syncRepository!: SyncRepositoryImpl;
   private categoriaRepository!: CategoriaRepositoryImpl;
   private almacenRepository!: AlmacenRepositoryImpl;
@@ -84,7 +89,6 @@ export class ServiceContainer {
   private registrarEntradaUseCase!: RegistrarEntradaUseCase;
   private registrarSalidaUseCase!: RegistrarSalidaUseCase;
   private sincronizarUseCase!: SincronizarUseCase;
-  private obtenerPreciosUseCase!: ObtenerPreciosUseCase;
   private obtenerResumenAlmacenUseCase!: ObtenerResumenAlmacenUseCase;
 
   private constructor() {}
@@ -113,8 +117,9 @@ export class ServiceContainer {
     // Inicializar Local DataSources
     this.authLocalDataSource = new AuthLocalDataSource();
     this.movimientoLocalDataSource = new MovimientoLocalDataSource();
-    this.precioLocalDataSource = new PrecioLocalDataSource();
     this.qrLocalDataSource = new QRLocalDataSource();
+    this.productoLocalDataSource = new ProductoLocalDataSource();
+    this.stockLocalDataSource = new StockLocalDataSource();
     this.configLocalDataSource = new ConfigLocalDataSource();
     this.categoriaLocalDataSource = new CategoriaLocalDataSource();
     this.almacenLocalDataSource = new AlmacenLocalDataSource();
@@ -123,7 +128,8 @@ export class ServiceContainer {
     this.authRemoteDataSource = new AuthRemoteDataSource();
     this.movimientoRemoteDataSource = new MovimientoRemoteDataSource();
     this.qrRemoteDataSource = new QRRemoteDataSource();
-    this.precioRemoteDataSource = new PrecioRemoteDataSource();
+    this.productoRemoteDataSource = new ProductoRemoteDataSource();
+    this.categoriaRemoteDataSource = new CategoriaRemoteDataSource();
     this.syncRemoteDataSource = new SyncRemoteDataSource();
     this.almacenRemoteDataSource = new AlmacenRemoteDataSource();
 
@@ -135,23 +141,28 @@ export class ServiceContainer {
     this.movimientoRepository = new MovimientoRepositoryImpl(
       this.movimientoLocalDataSource,
       this.movimientoRemoteDataSource,
-      this.qrLocalDataSource
+      this.qrLocalDataSource,
+      this.productoLocalDataSource
     );
     this.qrRepository = new QRRepositoryImpl(
       this.qrLocalDataSource,
       this.qrRemoteDataSource
     );
-    this.precioRepository = new PrecioRepositoryImpl(
-      this.precioLocalDataSource,
-      this.precioRemoteDataSource
+    this.productoRepository = new ProductoRepositoryImpl(
+      this.productoLocalDataSource
+    );
+    this.stockRepository = new StockRepositoryImpl(
+      this.stockLocalDataSource
     );
     this.syncRepository = new SyncRepositoryImpl(
       this.configLocalDataSource,
       this.syncRemoteDataSource,
-      this.precioLocalDataSource,
-      this.qrLocalDataSource,
-      this.movimientoLocalDataSource,
-      this.authLocalDataSource,
+      this.movimientoRemoteDataSource,
+      this.productoRemoteDataSource,
+      this.categoriaRemoteDataSource,
+      this.productoLocalDataSource,
+      this.stockLocalDataSource,
+      this.categoriaLocalDataSource
     );
     this.categoriaRepository = new CategoriaRepositoryImpl(
       this.categoriaLocalDataSource,
@@ -167,30 +178,26 @@ export class ServiceContainer {
     this.registrarEntradaUseCase = new RegistrarEntradaUseCase(
       this.movimientoRepository,
       this.qrRepository,
-      this.precioRepository,
-      this.syncRepository
+      this.productoRepository
     );
     this.registrarSalidaUseCase = new RegistrarSalidaUseCase(
       this.movimientoRepository,
       this.qrRepository,
-      this.syncRepository
+      this.productoRepository,
+      this.stockRepository
     );
     this.sincronizarUseCase = new SincronizarUseCase(
       this.syncRepository,
       this.movimientoRepository,
       this.authRepository,
-      this.precioRepository,
-      this.categoriaRepository,
       this.qrRepository,
       this.almacenRepository
     );
-    this.obtenerPreciosUseCase = new ObtenerPreciosUseCase(
-      this.precioRepository,
-      this.syncRepository
-    );
     this.obtenerResumenAlmacenUseCase = new ObtenerResumenAlmacenUseCase(
       this.movimientoRepository,
-      this.syncRepository
+      this.syncRepository,
+      this.productoRepository,
+      this.stockRepository
     );
 
     // Cargar configuración guardada
@@ -215,7 +222,8 @@ export class ServiceContainer {
   get auth() { return this.authRepository; }
   get movimiento() { return this.movimientoRepository; }
   get qr() { return this.qrRepository; }
-  get precio() { return this.precioRepository; }
+  get producto() { return this.productoRepository; }
+  get stock() { return this.stockRepository; }
   get sync() { return this.syncRepository; }
   get categoria() { return this.categoriaRepository; }
   get almacen() { return this.almacenRepository; }
@@ -226,14 +234,14 @@ export class ServiceContainer {
   get registrarEntrada() { return this.registrarEntradaUseCase; }
   get registrarSalida() { return this.registrarSalidaUseCase; }
   get sincronizar() { return this.sincronizarUseCase; }
-  get obtenerPrecios() { return this.obtenerPreciosUseCase; }
   get obtenerResumen() { return this.obtenerResumenAlmacenUseCase; }
 
   // DataSources directos (para casos especiales)
   get localAuth() { return this.authLocalDataSource; }
   get localMovimiento() { return this.movimientoLocalDataSource; }
-  get localPrecio() { return this.precioLocalDataSource; }
   get localQR() { return this.qrLocalDataSource; }
+  get localProducto() { return this.productoLocalDataSource; }
+  get localStock() { return this.stockLocalDataSource; }
   get localConfig() { return this.configLocalDataSource; }
   get localCategoria() { return this.categoriaLocalDataSource; }
   get localAlmacen() { return this.almacenLocalDataSource; }
@@ -249,7 +257,7 @@ export class ServiceContainer {
     if (!this.initialized) {
       await this.initialize();
     }
-    
+
     networkService.setBaseUrl(url);
     await this.configLocalDataSource.guardarApiUrl(url);
   }
@@ -278,7 +286,8 @@ export class ServiceContainer {
       movimientos_cache: await getTableCount('movimientos_cache'),
       movimientos_pendientes: await getTableCount('movimientos_pendientes WHERE sincronizado = 0'),
       qrs_cache: await getTableCount('qrs_cache'),
-      precios_cache: await getTableCount('precios_cache'),
+      productos_cache: await getTableCount('productos_cache'),
+      stock_cache: await getTableCount('stock_cache'),
       categorias_cache: await getTableCount('categorias_cache'),
       almacenes_cache: await getTableCount('almacenes_cache'),
       usuarios_offline: await getTableCount('usuarios_offline'),
@@ -292,7 +301,8 @@ export class ServiceContainer {
     await executeUpdate('DELETE FROM movimientos_cache');
     await executeUpdate('DELETE FROM movimientos_pendientes');
     await executeUpdate('DELETE FROM qrs_cache');
-    await executeUpdate('DELETE FROM precios_cache');
+    await executeUpdate('DELETE FROM productos_cache');
+    await executeUpdate('DELETE FROM stock_cache');
     await executeUpdate('DELETE FROM categorias_cache');
     await executeUpdate('DELETE FROM almacenes_cache');
     await executeUpdate('DELETE FROM usuarios_offline');
@@ -306,7 +316,8 @@ export class ServiceContainer {
       'movimientos_cache',
       'movimientos_pendientes',
       'qrs_cache',
-      'precios_cache',
+      'productos_cache',
+      'stock_cache',
       'categorias_cache',
       'almacenes_cache',
       'usuarios_offline',

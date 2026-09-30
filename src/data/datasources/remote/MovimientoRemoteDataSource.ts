@@ -1,70 +1,62 @@
 /**
  * Remote DataSource: Movimiento
- * Endpoints alineados con api-saci (NestJS)
+ * Endpoints alineados con api-saci (NestJS):
+ * - POST /api/movimiento-inventario/entrada
+ * - POST /api/movimiento-inventario/salida
+ * - GET  /api/registro-diario/actual/:almacenId
+ * - GET  /api/movimiento-inventario/stock
  */
 import { networkService } from '@/src/infrastructure';
 import {
-  RegistrarEntradaRequestDto,
-  RegistrarSalidaRequestDto,
+  RegistrarMovimientoRequestDto,
   ApiResponseDto,
-  MovimientoActivoDto,
-  ResumenAlmacenDto,
-  EstadoMovimientoDto,
+  RegistroDiarioDto,
+  StockApiDto,
 } from '../../dtos';
 
 export class MovimientoRemoteDataSource {
   /**
-   * Registra una entrada → POST /api/movimiento/
+   * Registra una ENTRADA → POST /api/movimiento-inventario/entrada
    */
-  async registrarEntrada(data: RegistrarEntradaRequestDto): Promise<ApiResponseDto> {
+  async registrarEntrada(data: RegistrarMovimientoRequestDto): Promise<ApiResponseDto> {
     const response = await networkService.post<ApiResponseDto>(
-      '/api/movimiento/',
+      '/api/movimiento-inventario/entrada',
       data
     );
     return response.data;
   }
 
   /**
-   * Registra una salida → PATCH /api/movimiento/:id
+   * Registra una SALIDA → POST /api/movimiento-inventario/salida
+   * El API valida stock suficiente (409 "Stock insuficiente").
    */
-  async registrarSalida(movimientoId: string, data: RegistrarSalidaRequestDto): Promise<ApiResponseDto> {
-    const response = await networkService.patch<ApiResponseDto>(
-      `/api/movimiento/${movimientoId}`,
+  async registrarSalida(data: RegistrarMovimientoRequestDto): Promise<ApiResponseDto> {
+    const response = await networkService.post<ApiResponseDto>(
+      '/api/movimiento-inventario/salida',
       data
     );
     return response.data;
   }
 
   /**
-   * Obtiene movimientos activos de un almacen
-   * API endpoint: GET /api/movimiento/activos?almacenId=X
+   * Registro diario del almacen (resumen del día)
+   * GET /api/registro-diario/actual/:almacenId
    */
-  async obtenerMovimientosActivos(almacenId: string): Promise<MovimientoActivoDto[]> {
-    const response = await networkService.get<MovimientoActivoDto[]>(
-      `/api/movimiento/activos?almacenId=${almacenId}`
+  async obtenerRegistroDiario(almacenId: string): Promise<RegistroDiarioDto> {
+    const response = await networkService.get<RegistroDiarioDto>(
+      `/api/registro-diario/actual/${almacenId}`
     );
     return response.data;
   }
 
   /**
-   * Obtiene el resumen del almacen
-   * API endpoint: GET /api/movimiento/resumen/:almacenId
+   * Stock derivado SIN filtros: retorna el stock de todos los productos en
+   * todos los almacenes del usuario (el API deriva el alcance del JWT).
+   * GET /api/movimiento-inventario/stock
    */
-  async obtenerResumenAlmacen(almacenId: string): Promise<ResumenAlmacenDto> {
-    const response = await networkService.get<ResumenAlmacenDto>(
-      `/api/movimiento/resumen/${almacenId}`
-    );
-    return response.data;
-  }
-
-  /**
-   * Verifica el estado de varios QRs a la vez (batch).
-   * API endpoint: POST /api/movimiento/estado
-   */
-  async verificarEstadoMovimientos(codigos: string[]): Promise<EstadoMovimientoDto[]> {
-    const response = await networkService.post<EstadoMovimientoDto[]>(
-      '/api/movimiento/estado',
-      { codigos }
+  async obtenerStock(): Promise<StockApiDto[]> {
+    const response = await networkService.get<StockApiDto[]>(
+      '/api/movimiento-inventario/stock'
     );
     return response.data;
   }

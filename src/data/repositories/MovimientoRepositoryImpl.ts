@@ -4,23 +4,23 @@
  *
  * Offline-first: el ledger en SQLite es la fuente de verdad de la pantalla.
  * El servidor es la fuente de verdad de los datos, pero toda operación queda
- * registrada localmente de inmediato (online u offline) y se reconcilia con
- * el servidor en cada sync/refresco.
+ * registrada localmente de inmediato (online u offline). Cada movimiento es
+ * un registro independiente e inmutable (a diferencia del ticket de parqueo,
+ * no hay "movimiento activo" que cerrar): la salida es un POST propio.
  */
 import { MovimientoRepository, RegistrarOptions } from '@/src/domain';
-import { 
-  Movimiento, 
-  MovimientoActivo,
-  RegistrarEntradaData, 
-  RegistrarSalidaData, 
+import {
+  Movimiento,
+  RegistrarMovimientoData,
   ResultadoOperacion,
   MovimientoPendiente,
   ResumenAlmacen
 } from '@/src/domain';
 import { MovimientoLocalDataSource } from '@/src/data/datasources/local/MovimientoLocalDataSource';
 import { QRLocalDataSource } from '@/src/data/datasources/local/QRLocalDataSource';
+import { ProductoLocalDataSource } from '@/src/data/datasources/local/ProductoLocalDataSource';
 import { MovimientoRemoteDataSource } from '@/src/data/datasources/remote/MovimientoRemoteDataSource';
-import { MovimientoMapper, MovimientoActivoMapper, ResumenAlmacenMapper } from '../mappers';
+import { MovimientoMapper, RegistroDiarioMapper } from '../mappers';
 import { ApiError } from '@/src/infrastructure';
 
 /** Errores que justifican degradar a modo offline y encolar la operación. */
@@ -41,41 +41,53 @@ export class MovimientoRepositoryImpl implements MovimientoRepository {
     private localDataSource: MovimientoLocalDataSource,
     private remoteDataSource: MovimientoRemoteDataSource,
     private qrLocalDataSource?: QRLocalDataSource,
+    private productoLocalDataSource?: ProductoLocalDataSource,
   ) {}
 
-  async registrarEntrada(data: RegistrarEntradaData, options?: RegistrarOptions): Promise<ResultadoOperacion> {
+  async registrarEntrada(data: RegistrarMovimientoData, options?: RegistrarOptions): Promise<ResultadoOperacion> {
     const permitirFallback = options?.permitirFallbackOffline !== false;
+
+    // Resolución de nombres desde las caches locales (para el ledger y el modal)
+    const info = await this.resolverInfoProducto(data);
+
     try {
-      const request = MovimientoMapper.toRegistrarEntradaRequest(data);
+      const request = MovimientoMapper.toRegistrarRequest(data);
       const response = await this.remoteDataSource.registrarEntrada(request);
 
       if (!response.successStatus) {
-        throw new Error(response.message || 'Error al registrar entrada');
+        throw new Error(response.message || 'Error al registrar la entrada');
       }
 
       // La API solo retorna { id, successStatus, message }
-      // Construimos el Movimiento con los datos que ya tenemos
-      const movimiento = MovimientoMapper.buildFromEntradaResponse(response.id || '', data);
+      const movimiento = MovimientoMapper.buildFromOperacion({
+        id: response.id || `local-${Date.now()}`,
+        tipo: 'entrada',
+        data,
+        productoNombre: info.productoNombre,
+        productoCodigo: info.productoCodigo,
+        categoriaNombre: info.categoriaNombre,
+        almacenNombre: info.almacenNombre,
+        sincronizado: true,
+      });
 
-      // Guardar SIEMPRE en el ledger local (online u offline): es la fuente
-      // de verdad de la pantalla hasta el cierre del día.
+      // Guardar SIEMPRE en el ledger local (online u offline)
       await this.localDataSource.guardarMovimiento(movimiento);
 
       return {
         exito: true,
         movimiento,
-        mensaje: `Entrada registrada. Cobrar: ${data.precioMonto.toFixed(2)}`,
+        mensaje: `Entrada registrada: +${data.cantidad} ${info.productoNombre}`.trim(),
         tipo: 'entrada',
       };
     } catch (error) {
       // Degradar a offline: el health check puede pasar y el POST fallar
       // (timeout, 5xx). Sin esto la operación se perdía: ni server ni local.
       if (permitirFallback && esErrorDeRed(error)) {
-        return this.guardarEntradaOffline(data);
+        return this.guardarOffline('entrada', data, info);
       }
 
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      
+
       return {
         exito: false,
         movimiento: null,
@@ -85,48 +97,45 @@ export class MovimientoRepositoryImpl implements MovimientoRepository {
     }
   }
 
-  async registrarSalida(data: RegistrarSalidaData, options?: RegistrarOptions): Promise<ResultadoOperacion> {
-    // Snapshot del movimiento activo ANTES de tocar el servidor: con la fecha
-    // y el monto reales del cache, para no perderlos si el registro online
-    // falla y hay que encolar la salida offline.
-    const local = await this.localDataSource.obtenerMovimientoPorId(data.movimientoId);
-    const snapshotFechaEntrada = local?.fechaEntrada || null;
-    const snapshotPrecio = local?.precioUnitarioCobrado ?? 0;
+  async registrarSalida(data: RegistrarMovimientoData, options?: RegistrarOptions): Promise<ResultadoOperacion> {
     const permitirFallback = options?.permitirFallbackOffline !== false;
 
+    const info = await this.resolverInfoProducto(data);
+
     try {
-      const request = MovimientoMapper.toRegistrarSalidaRequest(data);
-      const response = await this.remoteDataSource.registrarSalida(data.movimientoId, request);
+      const request = MovimientoMapper.toRegistrarRequest(data);
+      const response = await this.remoteDataSource.registrarSalida(request);
 
       if (!response.successStatus) {
-        throw new Error(response.message || 'Error al registrar salida');
+        throw new Error(response.message || 'Error al registrar la salida');
       }
 
-      // Actualizar el cache local SIN corromperlo: antes se hacía
-      // INSERT OR REPLACE con fechaEntrada=now y precio=0, borrando los
-      // datos reales de la entrada.
-      await this.localDataSource.actualizarSalida(
-        data.movimientoId,
-        options?.fechaSalida || new Date(),
-        snapshotPrecio,
-        true
-      );
+      const movimiento = MovimientoMapper.buildFromOperacion({
+        id: response.id || `local-${Date.now()}`,
+        tipo: 'salida',
+        data,
+        productoNombre: info.productoNombre,
+        productoCodigo: info.productoCodigo,
+        categoriaNombre: info.categoriaNombre,
+        almacenNombre: info.almacenNombre,
+        sincronizado: true,
+      });
 
-      const movimiento = await this.localDataSource.obtenerMovimientoPorId(data.movimientoId);
+      await this.localDataSource.guardarMovimiento(movimiento);
 
       return {
         exito: true,
         movimiento,
-        mensaje: 'Salida registrada. Ya estaba pagada al entrar.',
+        mensaje: `Salida registrada: -${data.cantidad} ${info.productoNombre}`.trim(),
         tipo: 'salida',
       };
     } catch (error) {
       if (permitirFallback && esErrorDeRed(error)) {
-        return this.guardarSalidaOffline(data, snapshotFechaEntrada, snapshotPrecio);
+        return this.guardarOffline('salida', data, info);
       }
 
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      
+
       return {
         exito: false,
         movimiento: null,
@@ -137,161 +146,125 @@ export class MovimientoRepositoryImpl implements MovimientoRepository {
   }
 
   /**
-   * Encola la entrada y la persiste localmente con id temporal `local-...`.
+   * Resuelve productoNombre/productoCodigo/categoriaNombre/almacenNombre
+   * desde las caches locales. La etiqueta QR es la fuente preferida (tiene
+   * el snapshot del producto al generar la etiqueta); si no, el catálogo de
+   * productos (registro manual por SKU).
    */
-  private async guardarEntradaOffline(data: RegistrarEntradaData): Promise<ResultadoOperacion> {
-    const idLocal = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const now = new Date();
+  private async resolverInfoProducto(data: RegistrarMovimientoData): Promise<{
+    productoNombre: string;
+    productoCodigo: string;
+    categoriaNombre: string;
+    almacenNombre: string;
+  }> {
+    const vacio = { productoNombre: '', productoCodigo: '', categoriaNombre: '', almacenNombre: '' };
 
-    const pendiente: MovimientoPendiente = {
-      idLocal,
-      operacion: 'entrada',
-      // fechaEntrada viaja dentro de data para que el sync preserve la hora
-      // real del cobro offline (no la de sincronización), igual que hace
-      // guardarSalidaOffline con fechaSalida.
-      data: { ...data, fechaEntrada: now.toISOString() } as RegistrarEntradaData,
-      createdAt: now,
-      reintentos: 0,
-    };
-    await this.movimientoPendienteGuardar(pendiente);
-
-    // Enriquecer con el nombre del tipo de medio si está en el cache de QRs
-    let categoriaNombre = '';
-    if (this.qrLocalDataSource && data.qrCodigo) {
-      try {
+    try {
+      if (data.qrCodigo && this.qrLocalDataSource) {
         const qr = await this.qrLocalDataSource.buscarQRPorCodigo(data.qrCodigo);
-        categoriaNombre = qr?.categoriaNombre || '';
-      } catch {
-        // ignore
+        if (qr) {
+          let productoNombre = qr.productoNombre || '';
+          let productoCodigo = qr.productoCodigo || '';
+          let categoriaNombre = '';
+
+          if ((!productoNombre || !categoriaNombre) && qr.productoId && this.productoLocalDataSource) {
+            const producto = await this.productoLocalDataSource.buscarPorId(qr.productoId);
+            if (producto) {
+              productoNombre = productoNombre || producto.nombre;
+              productoCodigo = productoCodigo || producto.codigo;
+              categoriaNombre = producto.categoriaNombre || '';
+            }
+          }
+
+          return {
+            productoNombre,
+            productoCodigo,
+            categoriaNombre,
+            almacenNombre: qr.almacenNombre || '',
+          };
+        }
       }
+
+      if (data.productoId && this.productoLocalDataSource) {
+        const producto =
+          (await this.productoLocalDataSource.buscarPorId(data.productoId)) ||
+          null;
+        if (producto) {
+          return {
+            productoNombre: producto.nombre,
+            productoCodigo: producto.codigo,
+            categoriaNombre: producto.categoriaNombre || '',
+            almacenNombre: '',
+          };
+        }
+      }
+
+      // Registro manual por SKU: el id real aún no se conoce (se resuelve en
+      // el servidor), pero el código SKU viaja en data como productoId de
+      // referencia local cuando el use case no pudo resolver el id.
+      return vacio;
+    } catch {
+      return vacio;
     }
-
-    const movimientoLocal: Movimiento = {
-      id: idLocal,
-      qrCodigo: data.qrCodigo,
-      almacenId: data.almacenId,
-      almacenNombre: '',
-      categoriaId: data.categoriaId,
-      categoriaNombre,
-      precioId: data.precioId,
-      precioUnitarioCobrado: data.precioMonto,
-      fechaEntrada: now,
-      fechaSalida: null,
-      sincronizado: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await this.localDataSource.guardarMovimiento(movimientoLocal);
-
-    return {
-      exito: true,
-      movimiento: movimientoLocal,
-      mensaje: `Entrada registrada sin conexión. Cobrar: ${data.precioMonto.toFixed(2)}. Se sincronizará automáticamente.`,
-      tipo: 'entrada',
-    };
   }
 
   /**
-   * Encola la salida y la persiste localmente preservando los datos reales
-   * de la entrada (fecha y monto del snapshot tomado antes de llamar a la API).
+   * Encola la operación y la persiste localmente con id temporal `local-...`.
+   * La fecha real del movimiento viaja dentro de data para que el sync la
+   * preserve (no la hora de sincronización).
    */
-  private async guardarSalidaOffline(
-    data: RegistrarSalidaData,
-    fechaEntrada: Date | null,
-    precioUnitarioCobrado: number
+  private async guardarOffline(
+    tipo: 'entrada' | 'salida',
+    data: RegistrarMovimientoData,
+    info: { productoNombre: string; productoCodigo: string; categoriaNombre: string; almacenNombre: string }
   ): Promise<ResultadoOperacion> {
     const idLocal = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const ahora = new Date();
 
     const pendiente: MovimientoPendiente = {
       idLocal,
-      operacion: 'salida',
-      // fechaSalida viaja dentro de data para que el sync preserve la hora
-      // real de la salida offline (no la hora de sincronización).
-      data: { ...data, fechaSalida: ahora.toISOString() },
+      operacion: tipo,
+      data: { ...data, fecha: data.fecha || ahora.toISOString() },
       createdAt: ahora,
       reintentos: 0,
     };
-    await this.movimientoPendienteGuardar(pendiente);
+    await this.localDataSource.guardarMovimientoPendiente(pendiente);
 
-    // Cerrar el movimiento en el ledger local sin corromperlo
-    await this.localDataSource.actualizarSalida(data.movimientoId, ahora, precioUnitarioCobrado, false);
+    const movimientoLocal = MovimientoMapper.buildFromOperacion({
+      id: idLocal,
+      tipo,
+      data: pendiente.data,
+      productoNombre: info.productoNombre,
+      productoCodigo: info.productoCodigo,
+      categoriaNombre: info.categoriaNombre,
+      almacenNombre: info.almacenNombre,
+      sincronizado: false,
+    });
+    await this.localDataSource.guardarMovimiento(movimientoLocal);
 
-    const movimientoLocal = await this.localDataSource.obtenerMovimientoPorId(data.movimientoId);
+    const verbo = tipo === 'entrada' ? 'Entrada' : 'Salida';
+    const signo = tipo === 'entrada' ? '+' : '-';
 
     return {
       exito: true,
       movimiento: movimientoLocal,
-      mensaje: 'Salida registrada sin conexión. Se sincronizará automáticamente.',
-      tipo: 'salida',
+      mensaje: `${verbo} registrada sin conexión: ${signo}${data.cantidad} ${info.productoNombre}`.trim() +
+        '. Se sincronizará automáticamente.',
+      tipo,
     };
   }
 
-  private async movimientoPendienteGuardar(pendiente: MovimientoPendiente): Promise<void> {
-    await this.localDataSource.guardarMovimientoPendiente(pendiente);
-  }
-
-  async obtenerMovimientosActivos(almacenId: string): Promise<MovimientoActivo[]> {
-    try {
-      const response = await this.remoteDataSource.obtenerMovimientosActivos(almacenId);
-      return response.map(MovimientoActivoMapper.toEntity);
-    } catch (error) {
-      // Fallback a datos locales — Movimiento → MovimientoActivo (subset)
-      const locales = await this.localDataSource.obtenerMovimientosActivos(almacenId);
-      return locales.map(m => ({
-        id: m.id,
-        fechaEntrada: m.fechaEntrada,
-        almacenId: m.almacenId,
-        almacenNombre: m.almacenNombre,
-        categoriaNombre: m.categoriaNombre,
-        precioMonto: m.precioUnitarioCobrado,
-      }));
-    }
-  }
-
   /**
-   * Resumen desde el servidor. Lanza si falla — el use case decide el fallback.
+   * Registro diario desde el servidor. Lanza si falla — el use case decide
+   * el fallback local.
    */
-  async obtenerResumenAlmacen(almacenId: string): Promise<ResumenAlmacen> {
-    const response = await this.remoteDataSource.obtenerResumenAlmacen(almacenId);
-    return ResumenAlmacenMapper.toEntity(response);
+  async obtenerRegistroDiario(almacenId: string): Promise<ResumenAlmacen> {
+    const response = await this.remoteDataSource.obtenerRegistroDiario(almacenId);
+    return RegistroDiarioMapper.toEntity(response);
   }
 
   async obtenerResumenLocal(almacenId: string): Promise<ResumenAlmacen> {
     return await this.localDataSource.obtenerResumenLocal(almacenId);
-  }
-
-  /**
-   * Reconcilia el ledger local contra los movimientos activos del servidor.
-   * Cierra localmente lo que el server ya cerró (salidas hechas por web u otro
-   * teléfono) y marca sincronizados los activos presentes en el server.
-   * Solo toca movimientos cuyo estado local ya estaba sincronizado.
-   * Retorna la cantidad de activos según el server, o null si no respondió.
-   */
-  async reconciliarMovimientosActivos(almacenId: string): Promise<number | null> {
-    try {
-      const activos = await this.remoteDataSource.obtenerMovimientosActivos(almacenId);
-      await this.localDataSource.reconciliarActivos(
-        almacenId,
-        activos.map(a => ({ id: a.id, fechaSalida: null })),
-        // Consulta batch de la fecha de salida real de los QR discrepantes
-        // (cerrados por web/otro teléfono). Si falla, cerrar con ahora.
-        async (codigos) => {
-          try {
-            const estados = await this.remoteDataSource.verificarEstadoMovimientos(codigos);
-            const fechas: Record<string, string | null> = {};
-            for (const estado of estados) fechas[estado.codigo] = estado.fechaSalida;
-            return fechas;
-          } catch {
-            return {};
-          }
-        }
-      );
-      return activos.length;
-    } catch {
-      // Sin respuesta del server no se puede reconciliar: el ledger queda como está
-      return null;
-    }
   }
 
   async obtenerMovimientosPendientes(): Promise<MovimientoPendiente[]> {
@@ -306,7 +279,7 @@ export class MovimientoRepositoryImpl implements MovimientoRepository {
     await this.localDataSource.guardarMovimiento(movimiento);
   }
 
-  async marcarSincronizado(idLocal: string, movimientoId: string): Promise<void> {
+  async marcarSincronizado(idLocal: string, movimientoId?: string): Promise<void> {
     await this.localDataSource.marcarSincronizado(idLocal, movimientoId);
   }
 
@@ -331,34 +304,5 @@ export class MovimientoRepositoryImpl implements MovimientoRepository {
       return await this.qrLocalDataSource.limpiarQRsInactivos();
     }
     return 0;
-  }
-
-  async obtenerMovimientoActivoPorQR(qrCodigo: string, almacenId: string): Promise<Movimiento | null> {
-    return await this.localDataSource.obtenerMovimientoPorQR(qrCodigo, almacenId);
-  }
-
-  async actualizarSalidaLocal(
-    movimientoId: string,
-    fechaSalida: Date,
-    precioUnitarioCobrado: number,
-    sincronizado: boolean
-  ): Promise<void> {
-    await this.localDataSource.actualizarSalida(movimientoId, fechaSalida, precioUnitarioCobrado, sincronizado);
-  }
-
-  async reemplazarIdMovimiento(idAnterior: string, idNuevo: string): Promise<void> {
-    await this.localDataSource.reemplazarIdMovimiento(idAnterior, idNuevo);
-  }
-
-  async obtenerMovimientoPorId(id: string): Promise<Movimiento | null> {
-    return await this.localDataSource.obtenerMovimientoPorId(id);
-  }
-
-  async obtenerUltimoMovimientoPorQR(qrCodigo: string, almacenId: string): Promise<Movimiento | null> {
-    return await this.localDataSource.obtenerUltimoMovimientoPorQR(qrCodigo, almacenId);
-  }
-
-  async eliminarMovimientoLocal(id: string): Promise<void> {
-    await this.localDataSource.eliminarMovimiento(id);
   }
 }

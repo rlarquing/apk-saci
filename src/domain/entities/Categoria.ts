@@ -1,6 +1,6 @@
 /**
  * Domain Entity: Categoria
- * Representa un tipo de vehículo/medio de transporte
+ * Representa una categoría de productos (nomenclador del API)
  * Campos alineados con la API (api-saci)
  */
 export interface Categoria {
@@ -11,13 +11,3 @@ export interface Categoria {
   createdAt: Date;
   updatedAt: Date;
 }
-
-/**
- * Lista de tipos de medio con precios
- */
-export interface CategoriaConPrecio {
-  categoria: Categoria;
-  precio: Precio | null;
-}
-
-import { Precio } from './Precio';

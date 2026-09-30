@@ -1,9 +1,9 @@
 /**
  * Repository Implementation: QRRepository
- * Incluye sincronización de QRs desde el API con purge
+ * Incluye sincronización de etiquetas desde el API con purge
  */
 import { QRRepository } from '@/src/domain';
-import { QR, ResultadoEscaneoQR } from '@/src/domain';
+import { QR, ResultadoEscaneoQR, EstadoQR } from '@/src/domain';
 import { QRLocalDataSource } from '@/src/data/datasources/local/QRLocalDataSource';
 import { QRRemoteDataSource } from '@/src/data/datasources/remote/QRRemoteDataSource';
 import { QRMapper, ValidarQRMapper } from '../mappers';
@@ -35,10 +35,9 @@ export class QRRepositoryImpl implements QRRepository {
             valido: false,
             qr: null,
             mensaje:
-              error instanceof Error ? error.message : 'No se pudo validar el QR',
+              error instanceof Error ? error.message : 'No se pudo validar la etiqueta',
             puedeEntrar: false,
             puedeSalir: false,
-            movimientoActivo: null,
           };
         }
       }
@@ -46,38 +45,38 @@ export class QRRepositoryImpl implements QRRepository {
 
     // Modo offline - validar contra cache local
     const qrLocal = await this.localDataSource.buscarQRPorCodigo(codigo);
-    
+
     if (!qrLocal) {
       return {
         valido: false,
         qr: null,
-        mensaje: 'QR no encontrado (sin conexión al servidor)',
+        mensaje: 'Etiqueta no encontrada (sin conexión al servidor)',
         puedeEntrar: false,
         puedeSalir: false,
-        movimientoActivo: null,
       };
     }
 
-    if (!qrLocal.activo) {
+    if (!qrLocal.activo || qrLocal.estado === 'anulado') {
       return {
         valido: false,
         qr: qrLocal,
-        mensaje: 'QR inactivo',
+        mensaje: 'La etiqueta está anulada',
         puedeEntrar: false,
         puedeSalir: false,
-        movimientoActivo: null,
       };
     }
 
-    // Verificar si tiene movimiento activo
-    // Nota: En modo offline completo, no podemos verificar esto con precisión
+    // Etiqueta reutilizable: disponible admite entrada; asignado admite
+    // entrada y salida. (El ajuste es una operación del panel web.)
+    const asignada = qrLocal.estado === 'asignado';
     return {
       valido: true,
       qr: qrLocal,
-      mensaje: 'QR válido (modo offline)',
+      mensaje: asignada
+        ? 'Etiqueta válida (modo offline): entrada o salida disponibles'
+        : 'Etiqueta válida (modo offline): primera asignación (entrada)',
       puedeEntrar: true,
-      puedeSalir: true,
-      movimientoActivo: null,
+      puedeSalir: asignada,
     };
   }
 
@@ -93,18 +92,22 @@ export class QRRepositoryImpl implements QRRepository {
     return await this.localDataSource.buscarQRPorCodigo(codigo);
   }
 
+  async actualizarEstadoLocal(codigo: string, estado: EstadoQR): Promise<void> {
+    await this.localDataSource.actualizarEstado(codigo, estado);
+  }
+
   /**
-   * Sincroniza QRs desde el servidor: PURGA cache y guarda datos frescos
-   * Usa paginación para obtener todos los QRs del usuario autenticado
+   * Sincroniza etiquetas desde el servidor: PURGA cache y guarda datos frescos
+   * Usa paginación para obtener todas las etiquetas de los almacenes del usuario
    */
-  async sincronizarQRs(almacenId: string): Promise<number> {
+  async sincronizarQRs(): Promise<number> {
     try {
       const hayConexion = await networkService.checkConnection();
       if (!hayConexion) {
         return 0;
       }
 
-      // Obtener todos los QRs paginados
+      // Obtener todas las etiquetas paginadas
       let todosQRs: QR[] = [];
       let page = 1;
       const limit = 100;
@@ -112,7 +115,7 @@ export class QRRepositoryImpl implements QRRepository {
 
       while (hasMore) {
         const result = await this.remoteDataSource.obtenerQRsPaginados(page, limit);
-        
+
         if (result.items.length === 0) {
           hasMore = false;
           break;
@@ -123,7 +126,9 @@ export class QRRepositoryImpl implements QRRepository {
           .map(dto => {
             const qrDto = QRRemoteDataSource.mapListadoToQRDto(dto);
             return QRMapper.toEntity(qrDto);
-          });
+          })
+          // Solo etiquetas operables: disponibles y asignadas activas
+          .filter(qr => qr.activo && qr.estado !== 'anulado');
         todosQRs = todosQRs.concat(qrs);
 
         // Si recibimos menos de 'limit' registros o ya estamos en la última página, terminamos

@@ -1,10 +1,10 @@
 /**
- * Constantes de colores y tema
+ * Constantes de colores y tema — marca SACI (teal de inventarios)
  */
 export const COLORS = {
-  primary: '#0F766E',  // Azul profesional
-  secondary: '#2D3E50',  // Azul oscuro
-  accent: '#6C99CC',    // Azul claro
+  primary: '#0F766E',   // Teal profundo (identidad SACI)
+  secondary: '#134E4A', // Teal oscuro (superficies)
+  accent: '#2DD4BF',    // Teal claro (acentos)
   white: '#FFFFFF',
   black: '#000000',
   gray: '#4A5568',

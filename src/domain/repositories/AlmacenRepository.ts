@@ -2,23 +2,18 @@
  * Repository Interface: AlmacenRepository
  * Define las operaciones de almacenes
  */
-import { Almacen, ResumenAlmacen } from '../entities';
+import { Almacen } from '../entities';
 
 export interface AlmacenRepository {
   /**
-   * Obtiene los almacenes asignados al usuario
+   * Obtiene los almacenes asignados al usuario (cache local)
    */
   obtenerAlmacenesAsignados(): Promise<Almacen[]>;
 
   /**
-   * Obtiene un almacen por ID
+   * Obtiene un almacen por ID (cache local)
    */
   obtenerAlmacen(id: string): Promise<Almacen | null>;
-
-  /**
-   * Obtiene el resumen de un almacen
-   */
-  obtenerResumenAlmacen(almacenId: string): Promise<ResumenAlmacen>;
 
   /**
    * Guarda almacenes localmente para uso offline
@@ -31,7 +26,7 @@ export interface AlmacenRepository {
   obtenerAlmacenesLocal(): Promise<Almacen[]>;
 
   /**
-   * Sincroniza almacenes desde el servidor
+   * Sincroniza almacenes desde el servidor (purge + replace)
    */
   sincronizarAlmacenes(): Promise<number>;
 }

@@ -43,7 +43,7 @@ export default function SelectAlmacenScreen() {
       await seleccionarAlmacen(almacen.id);
       router.replace('/(main)');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'No se pudo seleccionar el almacen');
+      Alert.alert('Error', error.message || 'No se pudo seleccionar el almacén');
     } finally {
       setIsLoading(false);
     }
@@ -74,7 +74,7 @@ export default function SelectAlmacenScreen() {
       disabled={isLoading}
     >
       <View style={styles.almacenIcon}>
-        <MaterialCommunityIcons name="parking" size={28} color={COLORS.white} />
+        <MaterialCommunityIcons name="warehouse" size={28} color={COLORS.white} />
       </View>
       <View style={styles.almacenInfo}>
         <Text style={styles.almacenName}>{item.nombre}</Text>
@@ -90,7 +90,7 @@ export default function SelectAlmacenScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.accent} />
-        <Text style={styles.loadingText}>Configurando almacen...</Text>
+        <Text style={styles.loadingText}>Configurando almacén...</Text>
       </View>
     );
   }
@@ -99,12 +99,12 @@ export default function SelectAlmacenScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Seleccionar Almacen</Text>
+        <Text style={styles.title}>Seleccionar Almacén</Text>
         <Text style={styles.subtitle}>
           Hola, {sesion?.usuario?.nombre || 'Usuario'}
         </Text>
         <Text style={styles.instructions}>
-          Seleccione el almacen donde trabajará hoy
+          Seleccione el almacén donde trabajará hoy
         </Text>
       </View>
 
@@ -117,7 +117,7 @@ export default function SelectAlmacenScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons name="parking" size={48} color={COLORS.gray} />
+            <MaterialCommunityIcons name="warehouse" size={48} color={COLORS.gray} />
             <Text style={styles.emptyText}>No hay almacenes asignados</Text>
           </View>
         }

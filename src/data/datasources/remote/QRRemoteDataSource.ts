@@ -1,7 +1,7 @@
 /**
  * Remote DataSource: QR
- * Maneja los códigos QR con el API
- * La API usa camelCase (ReadQrDto), el APK usa snake_case internamente
+ * Maneja las etiquetas QR reutilizables con el API
+ * La API usa camelCase (ReadQrDto), la APK usa snake_case internamente
  */
 import { networkService } from '@/src/infrastructure';
 import { ValidarQRResponseDto, QRDto } from '../../dtos';
@@ -18,15 +18,15 @@ interface QRListadoDto {
   id: string;
   codigo: string;
   numeroConsecutivo: number;
-  categoriaId: string;
-  categoriaNombre: string;
-  categoriaCodigo: string;
+  productoId: string;
+  productoNombre: string;
+  productoCodigo: string;
   almacenId: string;
   almacenNombre: string;
   contenido: string;
   fechaGeneracion: string;
   loteId: string;
-  estado: string;       // 'disponible' | 'usado' | 'anulado'
+  estado: string;       // 'disponible' | 'asignado' | 'anulado'
   fechaEstado?: string;
   activo: boolean;
 }
@@ -45,7 +45,8 @@ interface QRListadoResponseDto {
 export class QRRemoteDataSource {
   /**
    * Valida un código QR
-   * La API devuelve camelCase, se mapea a snake_case internamente
+   * GET /api/qr/validar?codigo=...&almacen_id=... (el query param lleva underscore)
+   * La API devuelve la respuesta casi directa; se mapea a snake_case interno.
    */
   async validarQR(codigo: string, almacenId: string): Promise<ValidarQRResponseDto> {
     const response = await networkService.get<any>(
@@ -55,9 +56,10 @@ export class QRRemoteDataSource {
   }
 
   /**
-   * Obtiene QRs paginados del servidor (ReadQrDto - camelCase)
-   * El API devuelve Pagination directa {items, meta} y filtra por almacenes del usuario autenticado (rol USUARIO)
-   * ADMIN ve todos los QRs
+   * Obtiene etiquetas paginadas del servidor (ReadQrDto - camelCase)
+   * El API devuelve Pagination directa {items, meta} y filtra por los
+   * almacenes del usuario autenticado (ADMIN ve todos).
+   * Nota: el endpoint no llena `links`; paginar con meta.totalPages.
    */
   async obtenerQRsPaginados(page: number = 1, limit: number = 100): Promise<QRListadoResponseDto> {
     try {
@@ -74,24 +76,32 @@ export class QRRemoteDataSource {
   }
 
   /**
-   * Convierte ReadQrDto (camelCase del API) a QRDto (snake_case interno)
+   * Convierte ReadQrDto (camelCase del API) a QRDto (snake_case interno).
+   * La etiqueta es reutilizable: se cachean las disponibles Y las asignadas
+   * (ambas permiten operar); solo se descartan las anuladas/inactivas.
    */
   static mapListadoToQRDto(dto: QRListadoDto): QRDto {
+    const descartada = !dto.activo || dto.estado === 'anulado';
     return {
       id: dto.id,
       codigo: dto.codigo,
-      lote_id: dto.loteId,
-      lote_nombre: '',  // No viene en ReadQrDto
-      activo: dto.activo && dto.estado === 'disponible',
-      categoria_id: dto.categoriaId,
-      categoria_nombre: dto.categoriaNombre,
-      created_at: dto.fechaGeneracion,
+      numeroConsecutivo: dto.numeroConsecutivo ?? 0,
+      producto_id: dto.productoId || null,
+      producto_nombre: dto.productoNombre || null,
+      producto_codigo: dto.productoCodigo || null,
+      almacen_id: dto.almacenId || null,
+      almacen_nombre: dto.almacenNombre || null,
+      lote_id: dto.loteId || null,
+      estado: dto.estado || 'disponible',
+      activo: !descartada,
+      created_at: dto.fechaGeneracion || new Date().toISOString(),
     };
   }
 
   /**
-   * Convierte la respuesta de validar QR (camelCase del API) a ValidarQRResponseDto (snake_case interno)
-   * La API devuelve puede_entrar/puede_salir/movimiento_activo; se usan directamente
+   * Convierte la respuesta de validar QR a ValidarQRResponseDto (snake_case interno)
+   * La API devuelve puede_entrada/puede_salida/puede_ajuste; movimiento_activo
+   * siempre es null en SACI (la etiqueta no tiene "movimiento abierto").
    */
   static mapValidarResponseToDto(data: any): ValidarQRResponseDto {
     const qr = data.qr;
@@ -102,25 +112,21 @@ export class QRRemoteDataSource {
       qr: qr ? {
         id: qr.id || '',
         codigo: qr.codigo || '',
-        lote_id: qr.loteId || '',
-        lote_nombre: qr.almacenNombre || '',
+        numeroConsecutivo: qr.numeroConsecutivo ?? 0,
+        producto_id: qr.productoId || null,
+        producto_nombre: qr.productoNombre || null,
+        producto_codigo: qr.productoCodigo || null,
+        almacen_id: qr.almacenId || null,
+        almacen_nombre: qr.almacenNombre || null,
+        lote_id: qr.loteId || null,
+        estado: qr.estado || 'disponible',
         activo: qr.activo === true,
-        categoria_id: qr.categoriaId || null,
-        categoria_nombre: qr.categoriaNombre || null,
         created_at: qr.fechaGeneracion || new Date().toISOString(),
       } : null,
-      puede_entrar: data.puede_entrar === true,
-      puede_salir: data.puede_salir === true,
-      movimiento_activo: data.movimiento_activo
-        ? {
-            id: data.movimiento_activo.id || '',
-            fecha_entrada: data.movimiento_activo.fechaEntrada || data.movimiento_activo.fecha_entrada || '',
-            almacen_id: data.movimiento_activo.almacenId || data.movimiento_activo.almacen_id || '',
-            almacen_nombre: data.movimiento_activo.almacenNombre || data.movimiento_activo.almacen_nombre || '',
-            categoria_nombre: data.movimiento_activo.categoriaNombre || data.movimiento_activo.categoria_nombre || '',
-            precio_monto: data.movimiento_activo.precioMonto ?? data.movimiento_activo.precio_monto ?? 0,
-          }
-        : null,
+      puede_entrada: data.puede_entrada === true,
+      puede_salida: data.puede_salida === true,
+      puede_ajuste: data.puede_ajuste === true,
+      movimiento_activo: null,
     };
   }
 }

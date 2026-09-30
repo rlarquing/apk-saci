@@ -1,38 +1,33 @@
 /**
  * Repository Interface: CategoriaRepository
- * Define las operaciones de tipos de medio
+ * Define las operaciones de categorías de productos
  */
-import { Categoria, CategoriaConPrecio } from '../entities';
+import { Categoria } from '../entities';
 
 export interface CategoriaRepository {
   /**
-   * Obtiene todos los tipos de medio activos
+   * Obtiene todas las categorías activas (cache local)
    */
-  obtenerTiposMedio(): Promise<Categoria[]>;
+  obtenerCategorias(): Promise<Categoria[]>;
 
   /**
-   * Obtiene tipos de medio con precios para un almacen
-   */
-  obtenerTiposMedioConPrecio(almacenId: string): Promise<CategoriaConPrecio[]>;
-
-  /**
-   * Obtiene un tipo de medio por ID
+   * Obtiene una categoría por ID (cache local)
    */
   obtenerCategoria(id: string): Promise<Categoria | null>;
 
   /**
-   * Guarda tipos de medio localmente para uso offline
+   * Guarda categorías localmente para uso offline
    */
-  guardarTiposMedioLocal(tipos: Categoria[]): Promise<void>;
+  guardarCategoriasLocal(categorias: Categoria[]): Promise<void>;
 
   /**
-   * Obtiene tipos de medio guardados localmente
+   * Obtiene categorías guardadas localmente
    */
-  obtenerTiposMedioLocal(): Promise<Categoria[]>;
+  obtenerCategoriasLocal(): Promise<Categoria[]>;
 
   /**
-   * Sincroniza tipos de medio desde el servidor
-   * Opcionalmente recibe datos del sync response para purgar y reemplazar
+   * Guarda en el cache local la lista liviana del select del nomenclador
+   * ([{value,label}]): descripcion=null, activo=true.
    */
-  sincronizarTiposMedio(tiposMedioSync?: any[]): Promise<number>;
+  guardarDesdeSelect(items: Array<{ value: string; label: string }>): Promise<number>;
 }

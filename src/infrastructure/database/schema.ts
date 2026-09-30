@@ -5,11 +5,11 @@
  */
 
 export const DATABASE_NAME = 'saci_offline.db';
-export const DATABASE_VERSION = 2;
+export const DATABASE_VERSION = 3;
 
 export const createTablesSQL = `
   -- Tabla de usuarios para login offline
-CREATE TABLE IF NOT EXISTS usuarios_offline (
+  CREATE TABLE IF NOT EXISTS usuarios_offline (
     user_name TEXT PRIMARY KEY,
     password_hash TEXT NOT NULL,
     usuario_json TEXT NOT NULL,
@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS usuarios_offline (
   );
 
   -- Tabla de movimientos pendientes de sincronización
+  -- El API /api/sync solo acepta entrada|salida (ajustes y traslados son web)
   CREATE TABLE IF NOT EXISTS movimientos_pendientes (
     id_local TEXT PRIMARY KEY,
     operacion TEXT NOT NULL CHECK(operacion IN ('entrada', 'salida')),
@@ -38,52 +39,73 @@ CREATE TABLE IF NOT EXISTS usuarios_offline (
     movimiento_id TEXT
   );
 
-  -- Tabla de movimientos locales (cache)
-  -- Campos alineados con MovimientoEntity del API
+  -- Ledger local de movimientos de inventario (cache)
+  -- Cada movimiento es un registro independiente e inmutable:
+  -- tipo ENTRADA (suma stock) o SALIDA (resta stock), con su cantidad.
   CREATE TABLE IF NOT EXISTS movimientos_cache (
     id TEXT PRIMARY KEY,
-    qr_codigo TEXT NOT NULL,
+    tipo TEXT NOT NULL CHECK(tipo IN ('entrada', 'salida')),
+    qr_codigo TEXT,
+    producto_id TEXT NOT NULL,
+    producto_nombre TEXT,
+    producto_codigo TEXT,
+    categoria_nombre TEXT,
     almacen_id TEXT NOT NULL,
     almacen_nombre TEXT,
-    categoria_id TEXT,
-    categoria_nombre TEXT,
-    precio_id TEXT,
-    precio_unitario_cobrado REAL DEFAULT 0,
-    fecha_entrada TEXT NOT NULL,
-    fecha_salida TEXT,
+    cantidad REAL NOT NULL,
+    fecha TEXT NOT NULL,
+    observaciones TEXT,
     sincronizado INTEGER DEFAULT 1,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
 
-  -- Tabla de QRs (cache)
+  -- Tabla de etiquetas QR reutilizables (cache)
+  -- Ciclo de vida: disponible → asignado (anulable). No es un ticket.
   CREATE TABLE IF NOT EXISTS qrs_cache (
     id TEXT PRIMARY KEY,
     codigo TEXT UNIQUE NOT NULL,
+    numero_consecutivo INTEGER DEFAULT 0,
+    producto_id TEXT,
+    producto_nombre TEXT,
+    producto_codigo TEXT,
+    almacen_id TEXT,
+    almacen_nombre TEXT,
     lote_id TEXT,
-    lote_nombre TEXT,
+    estado TEXT DEFAULT 'disponible',
     activo INTEGER DEFAULT 1,
-    categoria_id TEXT,
-    categoria_nombre TEXT,
+    fecha_generacion TEXT,
     created_at TEXT NOT NULL
   );
 
-  -- Tabla de precios (cache)
-  CREATE TABLE IF NOT EXISTS precios_cache (
+  -- Tabla de productos (catálogo, cache)
+  -- codigo = SKU autogenerado PRD-XXXXXX
+  CREATE TABLE IF NOT EXISTS productos_cache (
     id TEXT PRIMARY KEY,
-    monto REAL NOT NULL,
-    categoria_id TEXT NOT NULL,
+    codigo TEXT NOT NULL,
+    nombre TEXT NOT NULL,
+    descripcion TEXT,
+    categoria_id TEXT,
     categoria_nombre TEXT,
-    almacen_id TEXT,
+    unidad_nombre TEXT,
+    stock_minimo REAL DEFAULT 0,
     activo INTEGER DEFAULT 1,
-    fecha_vigencia_inicio TEXT NOT NULL,
-    fecha_vigencia_fin TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
 
-  -- Tabla de tipos de medio (cache)
-  -- Sin campo 'orden' (no existe en el API)
+  -- Tabla de stock derivado (cache)
+  -- El stock NUNCA se calcula localmente: llega del API en cada sync
+  -- (es un valor derivado del kardex completo del servidor).
+  CREATE TABLE IF NOT EXISTS stock_cache (
+    producto_id TEXT NOT NULL,
+    almacen_id TEXT NOT NULL,
+    stock REAL NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (producto_id, almacen_id)
+  );
+
+  -- Tabla de categorías (nomenclador, cache)
   CREATE TABLE IF NOT EXISTS categorias_cache (
     id TEXT PRIMARY KEY,
     nombre TEXT NOT NULL,
@@ -93,8 +115,7 @@ CREATE TABLE IF NOT EXISTS usuarios_offline (
     updated_at TEXT NOT NULL
   );
 
-  -- Tabla de almacenes (cache)
-  -- Usa 'descripcion' en vez de 'direccion', sin 'capacidad' (no existe en el API)
+  -- Tabla de almacenes (nomenclador, cache)
   CREATE TABLE IF NOT EXISTS almacenes_cache (
     id TEXT PRIMARY KEY,
     nombre TEXT NOT NULL,
@@ -113,11 +134,14 @@ CREATE TABLE IF NOT EXISTS usuarios_offline (
 
   -- Índices para búsquedas rápidas
   CREATE INDEX IF NOT EXISTS idx_movimientos_almacen ON movimientos_cache(almacen_id);
-  CREATE INDEX IF NOT EXISTS idx_movimientos_fecha ON movimientos_cache(fecha_entrada);
+  CREATE INDEX IF NOT EXISTS idx_movimientos_fecha ON movimientos_cache(fecha);
   CREATE INDEX IF NOT EXISTS idx_movimientos_sincronizado ON movimientos_cache(sincronizado);
+  CREATE INDEX IF NOT EXISTS idx_movimientos_producto ON movimientos_cache(producto_id);
   CREATE INDEX IF NOT EXISTS idx_qrs_codigo ON qrs_cache(codigo);
-  CREATE INDEX IF NOT EXISTS idx_precios_categoria ON precios_cache(categoria_id);
-  CREATE INDEX IF NOT EXISTS idx_precios_almacen ON precios_cache(almacen_id);
+  CREATE INDEX IF NOT EXISTS idx_qrs_estado ON qrs_cache(estado);
+  CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos_cache(codigo);
+  CREATE INDEX IF NOT EXISTS idx_stock_producto ON stock_cache(producto_id);
+  CREATE INDEX IF NOT EXISTS idx_stock_almacen ON stock_cache(almacen_id);
   CREATE INDEX IF NOT EXISTS idx_pendientes_sincronizado ON movimientos_pendientes(sincronizado);
 `;
 

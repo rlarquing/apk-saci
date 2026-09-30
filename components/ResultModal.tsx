@@ -51,7 +51,7 @@ export function ResultModal({
           {/* Icono */}
           <View style={[styles.iconContainer, isSuccess ? styles.successIconBg : styles.errorIconBg]}>
             <MaterialCommunityIcons
-              name={isSuccess ? (isEntry ? 'car-side' : 'hand-wave') : 'close-circle'}
+              name={isSuccess ? (isEntry ? 'package-variant' : 'package-variant-closed') : 'close-circle'}
               size={48}
               color={COLORS.white}
             />
@@ -72,50 +72,56 @@ export function ResultModal({
           {/* Detalles */}
           {isSuccess && movimiento && (
             <View style={styles.details}>
-              <View style={styles.detailRow}>
-                <MaterialCommunityIcons name="qrcode" size={18} color={COLORS.primary} />
-                <Text style={styles.detailText}>
-                  QR: {movimiento.qrCodigo}
-                </Text>
-              </View>
-
-              <View style={styles.detailRow}>
-                <MaterialCommunityIcons name="car" size={18} color={COLORS.primary} />
-                <Text style={styles.detailText}>
-                  Tipo: {movimiento.categoriaNombre}
-                </Text>
-              </View>
-
-              <View style={styles.detailRow}>
-                <MaterialCommunityIcons name="map-marker" size={18} color={COLORS.primary} />
-                <Text style={styles.detailText}>
-                  Almacen: {movimiento.almacenNombre}
-                </Text>
-              </View>
-
-              <View style={styles.detailRow}>
-                <MaterialCommunityIcons name="calendar-clock" size={18} color={COLORS.primary} />
-                <Text style={styles.detailText}>
-                  Entrada: {new Date(movimiento.fechaEntrada).toLocaleString()}
-                </Text>
-              </View>
-
-              {/* Datos específicos de salida: no se muestra monto, ya se cobró al entrar */}
-              {!isEntry && movimiento.fechaSalida && (
+              {movimiento.qrCodigo && (
                 <View style={styles.detailRow}>
-                  <MaterialCommunityIcons name="clock-outline" size={18} color={COLORS.primary} />
+                  <MaterialCommunityIcons name="qrcode" size={18} color={COLORS.primary} />
                   <Text style={styles.detailText}>
-                    Salida: {new Date(movimiento.fechaSalida).toLocaleString()}
+                    Etiqueta: {movimiento.qrCodigo}
                   </Text>
                 </View>
               )}
 
-              {/* Monto a cobrar: el cobro ocurre en la entrada */}
-              {isEntry && movimiento.precioUnitarioCobrado > 0 && (
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="package-variant" size={18} color={COLORS.primary} />
+                <Text style={styles.detailText} numberOfLines={2}>
+                  Producto: {movimiento.productoNombre}
+                  {movimiento.productoCodigo ? ` (${movimiento.productoCodigo})` : ''}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons
+                  name={isEntry ? 'arrow-down-bold' : 'arrow-up-bold'}
+                  size={18}
+                  color={isEntry ? COLORS.success : COLORS.error}
+                />
+                <Text style={[styles.detailText, { fontWeight: 'bold' }]}>
+                  Cantidad: {movimiento.cantidad}
+                  {movimiento.categoriaNombre ? ` (${movimiento.categoriaNombre})` : ''}
+                </Text>
+              </View>
+
+              {!!movimiento.almacenNombre && (
                 <View style={styles.detailRow}>
-                  <MaterialCommunityIcons name="cash-multiple" size={18} color={COLORS.primary} />
+                  <MaterialCommunityIcons name="warehouse" size={18} color={COLORS.primary} />
                   <Text style={styles.detailText}>
-                    Cobrar: ${movimiento.precioUnitarioCobrado.toFixed(2)}
+                    Almacén: {movimiento.almacenNombre}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="calendar-clock" size={18} color={COLORS.primary} />
+                <Text style={styles.detailText}>
+                  Fecha: {new Date(movimiento.fecha).toLocaleString()}
+                </Text>
+              </View>
+
+              {!!movimiento.observaciones && (
+                <View style={styles.detailRow}>
+                  <MaterialCommunityIcons name="text" size={18} color={COLORS.primary} />
+                  <Text style={styles.detailText}>
+                    Obs.: {movimiento.observaciones}
                   </Text>
                 </View>
               )}
