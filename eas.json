@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 13.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "credentialsSource": "local",
+        "buildType": "apk",
+        "env": {
+          "EXPO_PUBLIC_API_URL": "http://srv895496.hstgr.cloud:3003"
+        }
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle",
+        "env": {
+          "EXPO_PUBLIC_API_URL": "http://srv895496.hstgr.cloud:3003"
+        }
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
