@@ -24,6 +24,7 @@ import { ProductoRemoteDataSource } from '../../data/datasources/remote/Producto
 import { CategoriaRemoteDataSource } from '../../data/datasources/remote/CategoriaRemoteDataSource';
 import { SyncRemoteDataSource } from '../../data/datasources/remote/SyncRemoteDataSource';
 import { AlmacenRemoteDataSource } from '../../data/datasources/remote/AlmacenRemoteDataSource';
+import { ConteoInventarioRemoteDataSource } from '../../data/datasources/remote/ConteoInventarioRemoteDataSource';
 
 // Repository Implementations
 import { AuthRepositoryImpl } from '../../data/repositories/AuthRepositoryImpl';
@@ -34,6 +35,7 @@ import { StockRepositoryImpl } from '../../data/repositories/StockRepositoryImpl
 import { SyncRepositoryImpl } from '../../data/repositories/SyncRepositoryImpl';
 import { CategoriaRepositoryImpl } from '../../data/repositories/CategoriaRepositoryImpl';
 import { AlmacenRepositoryImpl } from '../../data/repositories/AlmacenRepositoryImpl';
+import { ConteoRepositoryImpl } from '../../data/repositories/ConteoRepositoryImpl';
 
 // Use Cases
 import { LoginUseCase } from '../../domain/usecases/LoginUseCase';
@@ -42,6 +44,14 @@ import { RegistrarEntradaUseCase } from '../../domain/usecases/RegistrarEntradaU
 import { RegistrarSalidaUseCase } from '../../domain/usecases/RegistrarSalidaUseCase';
 import { SincronizarUseCase } from '../../domain/usecases/SincronizarUseCase';
 import { ObtenerResumenAlmacenUseCase } from '../../domain/usecases/ObtenerResumenAlmacenUseCase';
+import {
+  CancelarConteoUseCase,
+  CerrarConteoUseCase,
+  ContarProductoUseCase,
+  CrearConteoUseCase,
+  ListarConteosUseCase,
+  ObtenerConteoUseCase,
+} from '../../domain/usecases/ConteoUseCases';
 
 // Network
 import { networkService } from '../network/NetworkService';
@@ -82,6 +92,14 @@ export class ServiceContainer {
   private syncRepository!: SyncRepositoryImpl;
   private categoriaRepository!: CategoriaRepositoryImpl;
   private almacenRepository!: AlmacenRepositoryImpl;
+  private conteoInventarioRemoteDataSource!: ConteoInventarioRemoteDataSource;
+  private conteoRepository!: ConteoRepositoryImpl;
+  private listarConteosUseCase!: ListarConteosUseCase;
+  private obtenerConteoUseCase!: ObtenerConteoUseCase;
+  private crearConteoUseCase!: CrearConteoUseCase;
+  private contarProductoUseCase!: ContarProductoUseCase;
+  private cerrarConteoUseCase!: CerrarConteoUseCase;
+  private cancelarConteoUseCase!: CancelarConteoUseCase;
 
   // Use Cases
   private loginUseCase!: LoginUseCase;
@@ -132,6 +150,7 @@ export class ServiceContainer {
     this.categoriaRemoteDataSource = new CategoriaRemoteDataSource();
     this.syncRemoteDataSource = new SyncRemoteDataSource();
     this.almacenRemoteDataSource = new AlmacenRemoteDataSource();
+    this.conteoInventarioRemoteDataSource = new ConteoInventarioRemoteDataSource();
 
     // Inicializar Repositories
     this.authRepository = new AuthRepositoryImpl(
@@ -171,6 +190,9 @@ export class ServiceContainer {
       this.almacenLocalDataSource,
       this.almacenRemoteDataSource,
     );
+    this.conteoRepository = new ConteoRepositoryImpl(
+      this.conteoInventarioRemoteDataSource
+    );
 
     // Inicializar Use Cases
     this.loginUseCase = new LoginUseCase(this.authRepository);
@@ -199,6 +221,12 @@ export class ServiceContainer {
       this.productoRepository,
       this.stockRepository
     );
+    this.listarConteosUseCase = new ListarConteosUseCase(this.conteoRepository);
+    this.obtenerConteoUseCase = new ObtenerConteoUseCase(this.conteoRepository);
+    this.crearConteoUseCase = new CrearConteoUseCase(this.conteoRepository);
+    this.contarProductoUseCase = new ContarProductoUseCase(this.conteoRepository);
+    this.cerrarConteoUseCase = new CerrarConteoUseCase(this.conteoRepository);
+    this.cancelarConteoUseCase = new CancelarConteoUseCase(this.conteoRepository);
 
     // Cargar configuración guardada
     const savedApiUrl = await this.configLocalDataSource.obtenerApiUrl();
@@ -227,6 +255,7 @@ export class ServiceContainer {
   get sync() { return this.syncRepository; }
   get categoria() { return this.categoriaRepository; }
   get almacen() { return this.almacenRepository; }
+  get conteo() { return this.conteoRepository; }
 
   // Use Cases
   get login() { return this.loginUseCase; }
@@ -235,6 +264,12 @@ export class ServiceContainer {
   get registrarSalida() { return this.registrarSalidaUseCase; }
   get sincronizar() { return this.sincronizarUseCase; }
   get obtenerResumen() { return this.obtenerResumenAlmacenUseCase; }
+  get listarConteos() { return this.listarConteosUseCase; }
+  get obtenerConteo() { return this.obtenerConteoUseCase; }
+  get crearConteo() { return this.crearConteoUseCase; }
+  get contarProducto() { return this.contarProductoUseCase; }
+  get cerrarConteo() { return this.cerrarConteoUseCase; }
+  get cancelarConteo() { return this.cancelarConteoUseCase; }
 
   // DataSources directos (para casos especiales)
   get localAuth() { return this.authLocalDataSource; }

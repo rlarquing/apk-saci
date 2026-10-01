@@ -20,6 +20,14 @@ export default function MainLayout() {
         options={{ title: 'Escáner QR', headerShown: true }}
       />
       <Stack.Screen
+        name="conteos"
+        options={{ title: 'Conteos Cíclicos', headerShown: true }}
+      />
+      <Stack.Screen
+        name="conteo-activo"
+        options={{ title: 'Conteo en curso', headerShown: true }}
+      />
+      <Stack.Screen
         name="profile"
         options={{ title: 'Mi Perfil', headerShown: true }}
       />

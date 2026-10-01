@@ -9,3 +9,4 @@ export * from './StockRepository';
 export * from './AlmacenRepository';
 export * from './CategoriaRepository';
 export * from './SyncRepository';
+export * from './ConteoRepository';

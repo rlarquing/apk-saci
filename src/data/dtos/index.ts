@@ -244,3 +244,51 @@ export interface SyncErrorDto {
   operacion: string;
   error: string;
 }
+
+// ============ CONTEO CÍCLICO ============
+
+export interface ConteoLineaDto {
+  productoId: string;
+  productoCodigo: string;
+  productoNombre: string;
+  cantidadEsperada: number;
+  cantidadContada: number | null;
+  stockAlCierre: number | null;
+  diferencia: number | null;
+  ajusteId: string | null;
+  observaciones?: string | null;
+}
+
+/** Reflejo del ReadConteoDto del API (con líneas embebidas). */
+export interface ConteoDto {
+  id: string;
+  almacenId: string;
+  almacenNombre: string;
+  userName: string;
+  estado: 'ABIERTO' | 'CERRADO' | 'CANCELADO';
+  esCiego: boolean;
+  fechaApertura?: string;
+  fechaCierre?: string;
+  lineas: ConteoLineaDto[];
+  resumen: {
+    lineas: number;
+    contadas: number;
+    sinContar: number;
+    sobrantes: number;
+    faltantes: number;
+    ajustesGenerados: number;
+    errores: Array<{ productoCodigo: string; error: string }>;
+  } | null;
+  totalLineas: number;
+  totalContadas: number;
+}
+
+export interface CrearConteoRequestDto {
+  almacenId: string;
+  esCiego: boolean;
+}
+
+export interface ConteoLineaRequestDto {
+  productoId: string;
+  cantidadContada: number;
+}

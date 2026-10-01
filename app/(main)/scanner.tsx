@@ -23,10 +23,19 @@ interface InfoEscaneo {
   productoNombre: string;
   productoCodigo: string;
   stockDisponible: number | null;
+  /** Foto del producto (endpoint público del API; null si no tiene) */
+  productoFotoUrl: string | null;
 }
 
 /** Prefijo del SKU autogenerado por el API para productos */
 const PREFIJO_SKU = /^PRD-[0-9A-Za-z]+$/i;
+
+/** Construye la URL pública de la foto de un producto. */
+const urlFotoProducto = (productoId: string): string | null => {
+  if (!productoId) return null;
+  const base = serviceContainer.network.getBaseUrl().replace(/\/$/, '');
+  return `${base}/api/producto-foto/${productoId}`;
+};
 
 export default function ScannerScreen() {
   const params = useLocalSearchParams<{ operation: TipoOperacion }>();
@@ -93,6 +102,7 @@ export default function ScannerScreen() {
             productoNombre: producto.nombre,
             productoCodigo: producto.codigo,
             stockDisponible: stock,
+            productoFotoUrl: urlFotoProducto(producto.id),
           });
         } else {
           // Modo etiqueta QR: validar antes de pedir la cantidad
@@ -128,6 +138,7 @@ export default function ScannerScreen() {
             productoNombre: qr?.productoNombre || '',
             productoCodigo: qr?.productoCodigo || '',
             stockDisponible: stock,
+            productoFotoUrl: urlFotoProducto(qr?.productoId || ''),
           });
         }
 
@@ -194,6 +205,7 @@ export default function ScannerScreen() {
         productoNombre={escaneo?.productoNombre || ''}
         productoCodigo={escaneo?.productoCodigo || ''}
         stockDisponible={escaneo?.stockDisponible ?? null}
+        productoFotoUrl={escaneo?.productoFotoUrl ?? null}
         onCancel={handleCancelCantidad}
         onConfirm={handleConfirmarCantidad}
       />

@@ -9,3 +9,4 @@ export * from './StockRepositoryImpl';
 export * from './AlmacenRepositoryImpl';
 export * from './CategoriaRepositoryImpl';
 export * from './SyncRepositoryImpl';
+export * from './ConteoRepositoryImpl';

@@ -1,8 +1,10 @@
 /**
- * Modal de captura de cantidad
- * Paso intermedio del escáner: tras validar la etiqueta (o resolver el SKU),
- * el operador indica cuántas unidades entran o salen. La cantidad es LA
- * diferencia central respecto de un ticket de un solo uso.
+ * Modal de captura de cantidad CONTADA para el conteo cíclico (backlog P1).
+ * Diferencias respecto de CantidadModal (entradas/salidas):
+ * - El 0 es una cantidad válida (el producto puede estar a cero).
+ * - No valida stock: aquí la cantidad física es la verdad.
+ * - Muestra el stock esperado solo si el conteo NO es a ciegas.
+ * - Muestra la foto del producto si está disponible (endpoint público).
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -18,49 +20,44 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../src/shared/constants';
-import { TipoOperacion } from '../src/domain/entities';
 
-/** Límite de cantidad del API: CreateEntradaDto (0.01 - 999999.99) */
+/** Límite de cantidad del API: ConteoLineaDto (0 - 999999.99) */
 const MAX_CANTIDAD = 999999.99;
 const REGEX_CANTIDAD = /^\d{1,6}([.,]\d{1,2})?$/;
 
-interface CantidadModalProps {
+interface ConteoCantidadModalProps {
   visible: boolean;
-  operation: TipoOperacion;
   codigo: string;
   productoNombre: string;
   productoCodigo: string;
-  /** Stock conocido del producto en el almacén (null: sin dato local) */
-  stockDisponible: number | null;
-  /** Foto del producto (endpoint público del API; null: sin foto) */
+  /** Stock esperado (null: conteo a ciegas) */
+  cantidadEsperada: number | null;
   productoFotoUrl?: string | null;
   onCancel: () => void;
   onConfirm: (cantidad: number) => void;
+  guardando?: boolean;
 }
 
-export function CantidadModal({
+export function ConteoCantidadModal({
   visible,
-  operation,
   codigo,
   productoNombre,
   productoCodigo,
-  stockDisponible,
+  cantidadEsperada,
   productoFotoUrl,
   onCancel,
   onConfirm,
-}: CantidadModalProps) {
-  const [texto, setTexto] = useState('1');
+  guardando = false,
+}: ConteoCantidadModalProps) {
+  const [texto, setTexto] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
-      setTexto('1');
+      setTexto('');
       setError(null);
     }
   }, [visible]);
-
-  const esEntrada = operation === 'entrada';
-  const titulo = esEntrada ? 'Registrar Entrada' : 'Registrar Salida';
 
   const confirmar = () => {
     const normalizado = texto.replace(',', '.').trim();
@@ -71,19 +68,12 @@ export function CantidadModal({
     }
 
     const cantidad = parseFloat(normalizado);
-    if (!(cantidad > 0)) {
-      setError('La cantidad debe ser mayor que cero');
+    if (cantidad < 0) {
+      setError('La cantidad no puede ser negativa');
       return;
     }
     if (cantidad > MAX_CANTIDAD) {
       setError('La cantidad excede el máximo permitido');
-      return;
-    }
-
-    // Validación previa de stock con el dato local (la salida definitiva la
-    // valida el API contra el kardex real)
-    if (!esEntrada && stockDisponible !== null && cantidad > stockDisponible) {
-      setError(`Stock insuficiente: disponible ${stockDisponible}`);
       return;
     }
 
@@ -99,13 +89,9 @@ export function CantidadModal({
       >
         <View style={styles.modal}>
           {/* Título */}
-          <View style={[styles.header, esEntrada ? styles.headerEntrada : styles.headerSalida]}>
-            <MaterialCommunityIcons
-              name={esEntrada ? 'package-variant' : 'package-variant-closed'}
-              size={24}
-              color={COLORS.white}
-            />
-            <Text style={styles.headerText}>{titulo}</Text>
+          <View style={styles.header}>
+            <MaterialCommunityIcons name="clipboard-check" size={24} color={COLORS.white} />
+            <Text style={styles.headerText}>Cantidad Contada</Text>
           </View>
 
           {/* Producto identificado */}
@@ -132,18 +118,18 @@ export function CantidadModal({
                 </Text>
               </View>
             ) : null}
-            {!esEntrada && stockDisponible !== null && (
+            {cantidadEsperada !== null && (
               <View style={styles.productoRow}>
-                <MaterialCommunityIcons name="clipboard-list" size={16} color={COLORS.warning} />
-                <Text style={[styles.productoText, { color: COLORS.warning }]}>
-                  Stock disponible: {stockDisponible}
+                <MaterialCommunityIcons name="clipboard-list" size={16} color={COLORS.gray} />
+                <Text style={[styles.productoText, { color: COLORS.gray }]}>
+                  Esperado según sistema: {cantidadEsperada}
                 </Text>
               </View>
             )}
           </View>
 
           {/* Captura de cantidad */}
-          <Text style={styles.label}>Cantidad de unidades</Text>
+          <Text style={styles.label}>Unidades contadas físicamente</Text>
           <TextInput
             style={styles.input}
             value={texto}
@@ -160,14 +146,11 @@ export function CantidadModal({
 
           {/* Botones */}
           <View style={styles.botones}>
-            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onCancel}>
+            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onCancel} disabled={guardando}>
               <Text style={[styles.buttonText, { color: COLORS.gray }]}>Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, esEntrada ? styles.okEntrada : styles.okSalida]}
-              onPress={confirmar}
-            >
-              <Text style={styles.buttonText}>Confirmar</Text>
+            <TouchableOpacity style={[styles.button, styles.okConteo]} onPress={confirmar} disabled={guardando}>
+              <Text style={styles.buttonText}>{guardando ? 'Guardando…' : 'Confirmar'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -199,12 +182,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     marginBottom: 15,
-  },
-  headerEntrada: {
-    backgroundColor: COLORS.success,
-  },
-  headerSalida: {
-    backgroundColor: COLORS.error,
+    backgroundColor: COLORS.primary,
   },
   headerText: {
     color: COLORS.white,
@@ -235,53 +213,47 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   label: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '600',
     color: COLORS.gray,
-    marginBottom: 8,
-    textAlign: 'center',
+    marginBottom: 6,
   },
   input: {
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.lightGray,
     borderRadius: 10,
     paddingVertical: 10,
-    paddingHorizontal: 15,
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    paddingHorizontal: 14,
+    fontSize: 18,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   errorText: {
-    fontSize: 13,
     color: COLORS.error,
+    fontSize: 12,
+    marginBottom: 8,
     textAlign: 'center',
-    marginBottom: 10,
   },
   botones: {
     flexDirection: 'row',
     gap: 10,
+    marginTop: 10,
   },
   button: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   cancelButton: {
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: '#f3f4f6',
   },
-  okEntrada: {
-    backgroundColor: COLORS.success,
-  },
-  okSalida: {
-    backgroundColor: COLORS.error,
+  okConteo: {
+    backgroundColor: COLORS.primary,
   },
   buttonText: {
     color: COLORS.white,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
   },
 });

@@ -7,6 +7,7 @@ export * from './QR';
 export * from './Producto';
 export * from './Almacen';
 export * from './Categoria';
+export * from './Conteo';
 
 export interface SyncResult {
   exito: boolean;

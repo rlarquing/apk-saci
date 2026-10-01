@@ -373,6 +373,20 @@ export default function MainScreen() {
             <Text style={styles.operationSubtitle}>Registrar salida de producto</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Acceso al conteo cíclico (backlog P1) */}
+        <TouchableOpacity
+          style={styles.conteosButton}
+          onPress={() => router.push('/(main)/conteos')}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="clipboard-check" size={26} color={COLORS.white} />
+          <View style={styles.conteosTextos}>
+            <Text style={styles.conteosTitulo}>CONTEOS CÍCLICOS</Text>
+            <Text style={styles.conteosSubtitulo}>Verificar el inventario físico (requiere conexión)</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={COLORS.accent} />
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -570,6 +584,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
     lineHeight: 22,
+  },
+  conteosButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: COLORS.secondary,
+    borderRadius: 15,
+    padding: 16,
+    marginTop: 14,
+  },
+  conteosTextos: {
+    flex: 1,
+  },
+  conteosTitulo: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  conteosSubtitulo: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    marginTop: 2,
   },
   buttonsContainer: {
     flexDirection: 'row',
