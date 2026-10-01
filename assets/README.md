@@ -1,47 +1,26 @@
-# Assets
+# Assets — Marca SACI
 
-Esta carpeta contiene los recursos gráficos de la aplicación.
+Recursos gráficos de la aplicación. Todos derivan del logo oficial de SACI
+(brackets de escaneo QR + caja de inventario) definido en el repo
+[`docs-saci/brand/`](https://github.com/rlarquing/docs-saci/tree/master/brand).
 
-## Archivos necesarios:
+## Archivos
 
-1. **icon.png** (1024x1024)
-   - Icono principal de la aplicación
-   - Usado para el ícono de la app en el dispositivo
-
-2. **adaptive-icon.png** (1024x1024)
-   - Icono adaptativo para Android
-   - Debe tener fondo transparente o sólido
-
-3. **splash.png** (1284x2778 recomendado)
-   - Imagen de pantalla de carga
-   - Se muestra mientras la app carga
-
-4. **favicon.png** (48x48)
-   - Icono pequeño para web
-
-## Generar assets automáticamente
-
-Puedes usar herramientas como:
-- [Expo Icon Generator](https://buildicon.netlify.app/)
-- [App Icon Generator](https://appicon.co/)
-- [MakeAppIcon](https://makeappicon.com/)
+| Archivo | Dimensiones | Uso |
+|---|---|---|
+| `icon.png` | 1024×1024 (RGB opaco) | Icono principal de la app (`app.json → expo.icon`) |
+| `adaptive-icon.png` | 1024×1024 (RGBA transparente) | Capa frontal del icono adaptativo Android (`app.json → android.adaptiveIcon.foregroundImage`); el fondo lo pone `backgroundColor: #0F766E` |
+| `splash.png` | 720×1080 (RGBA transparente) | Pantalla de carga, glifo blanco centrado; se muestra sobre fondo `#0F766E` (`expo-splash-screen` + `app/_layout.tsx`) |
+| `logo.png` | 512×512 (RGB opaco) | Emblem de reserva para pantallas/README |
 
 ## Colores de la marca
 
-- **Primary**: #1a1a2e (azul oscuro)
-- **Secondary**: #16213e (azul más oscuro)
-- **Accent**: #e94560 (rosa/rojo)
-- **Success**: #4ade80 (verde)
-- **Error**: #ef4444 (rojo)
+- **Primario (teal SACI)**: `#0F766E` — fondo de icono, splash y acentos
+- **Superficie**: `#FFFFFF` / neutros claros
+- El teal de marca es el mismo en toda la plataforma: web-saci, apk-saci y documentación
 
-## Generar desde SVG
+## Regenerar variantes
 
-Si tienes ImageMagick instalado:
-
-```bash
-# Icono principal
-convert -background "#1a1a2e" -size 1024x1024 icon.svg icon.png
-
-# Splash
-convert -background "#1a1a2e" -size 1284x2778 splash.svg splash.png
-```
+Las variantes (favicon, PWA, splash, wordmark horizontal, versión clara/oscura)
+se generan desde el master del logo. Ver `docs-saci/brand/README.md` para la
+guía de marca completa y las reglas de uso.
