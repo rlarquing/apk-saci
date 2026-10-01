@@ -128,6 +128,10 @@ export default function MainScreen() {
     });
   };
 
+  const goToHistorial = () => {
+    router.push('/(main)/historial');
+  };
+
   const goToSettings = () => {
     router.push('/settings');
   };
@@ -227,6 +231,9 @@ export default function MainScreen() {
           headerShown: true,
           headerRight: () => (
             <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.headerButton} onPress={goToHistorial}>
+                <MaterialCommunityIcons name="history" size={26} color={COLORS.white} />
+              </TouchableOpacity>
               <TouchableOpacity style={styles.headerButton} onPress={goToProfile}>
                 <MaterialCommunityIcons name="account-circle" size={28} color={COLORS.white} />
               </TouchableOpacity>
@@ -297,7 +304,35 @@ export default function MainScreen() {
                 <Text style={styles.statValue}>{resumen.alertasBajoMinimo ?? 0}</Text>
                 <Text style={styles.statLabel}>Bajo Mínimo</Text>
               </View>
+              <View style={styles.statCard}>
+                <MaterialCommunityIcons name="tune" size={24} color={COLORS.accent} />
+                <Text style={styles.statValue}>{resumen.alertasReorden ?? 0}</Text>
+                <Text style={styles.statLabel}>Punto Reorden</Text>
+              </View>
             </View>
+
+            {/* Requieren reposición (umbral efectivo por almacén — P2) */}
+            {resumen.itemsReponer && resumen.itemsReponer.length > 0 && (
+              <View style={styles.detalleContainer}>
+                <Text style={styles.detalleTitle}>Requieren Reposición (punto de reorden)</Text>
+                {resumen.itemsReponer.slice(0, 5).map((item, index) => (
+                  <View key={index} style={styles.detalleRow}>
+                    <Text
+                      style={[
+                        styles.detalleCategoria,
+                        item.estado === 'BAJO_MINIMO' && { color: COLORS.error },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.productoCodigo} {item.productoNombre}
+                    </Text>
+                    <Text style={styles.detalleSalidas}>
+                      {item.stock}/{item.puntoReorden} · +{item.sugerido}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
             {/* Detalle por categoría */}
             {resumen.detalleCategorias && resumen.detalleCategorias.length > 0 && (

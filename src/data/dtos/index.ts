@@ -157,6 +157,7 @@ export interface ProductoDto {
   unidadId?: string | null;
   unidadNombre: string | null;
   stockMinimo: number;
+  stockSeguridad?: number;
   activo: boolean;
   createdAt: string;
   updatedAt?: string;
@@ -206,8 +207,29 @@ export interface ProductoSyncDto {
   categoriaNombre: string;
   unidadNombre: string;
   stockMinimo: number;
+  stockSeguridad: number;
   activo: boolean;
   updatedAt: string;
+}
+
+/** Nivel de stock por producto/almacén (safety stock — P2) del sync. */
+export interface NivelStockSyncDto {
+  productoId: string;
+  almacenId: string;
+  stockMinimo: number;
+  stockSeguridad: number;
+}
+
+/** Nivel de stock leído del GET /api/nivel-stock (ReadNivelStockDto). */
+export interface NivelStockApiDto {
+  id: string;
+  productoId: string;
+  productoCodigo: string;
+  productoNombre: string;
+  almacenId: string;
+  almacenNombre: string;
+  stockMinimo: number;
+  stockSeguridad: number;
 }
 
 export interface StockSyncDto {
@@ -237,6 +259,7 @@ export interface SyncResponseDto {
   productos: ProductoSyncDto[];
   stock: StockSyncDto[];
   categorias: CategoriaSyncDto[];
+  niveles?: NivelStockSyncDto[];
 }
 
 export interface SyncErrorDto {
@@ -291,4 +314,21 @@ export interface CrearConteoRequestDto {
 export interface ConteoLineaRequestDto {
   productoId: string;
   cantidadContada: number;
+}
+
+/** Fila del kardex del API (ReadMovimientoInventarioDto) — timeline P2. */
+export interface MovimientoKardexApiDto {
+  id: string;
+  tipo: 'ENTRADA' | 'SALIDA' | 'AJUSTE' | 'TRASLADO';
+  productoCodigo: string;
+  productoNombre: string;
+  cantidad: number;
+  almacenNombre: string;
+  almacenDestinoNombre?: string | null;
+  qrCodigo?: string | null;
+  userName: string;
+  fecha: string;
+  saldoResultante?: number | null;
+  observaciones?: string | null;
+  signoAjuste?: number | null;
 }

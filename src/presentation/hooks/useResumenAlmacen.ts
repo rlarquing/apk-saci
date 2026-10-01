@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { ResumenAlmacen } from '@/src/domain';
 import { serviceContainer } from '@/src/infrastructure/di/ServiceContainer';
+import { alertasLocalesService } from '@/src/infrastructure/alerts/AlertasLocales';
 import { useAuth } from '@/src/presentation/contexts/AuthContext';
 
 // Polling del resumen en primer plano. No es la misma cadencia que el
@@ -55,6 +56,11 @@ export function useResumenAlmacen(): UseResumenAlmacenReturn {
         sesion.almacenSeleccionado.id
       );
       setResumen(result);
+      // Push local: notificar SOLO productos recién caídos bajo el punto de
+      // reorden (backlog P2). Best-effort; ignora permisos denegados.
+      alertasLocalesService
+        .procesarAlertas(result.itemsReponer ?? [], sesion.almacenSeleccionado.id)
+        .catch(() => {});
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al obtener resumen';
       setError(errorMessage);

@@ -14,6 +14,7 @@ interface ProductoRow {
   categoria_nombre: string | null;
   unidad_nombre: string | null;
   stock_minimo: number;
+  stock_seguridad: number;
   activo: number;
   created_at: string;
   updated_at: string;
@@ -25,8 +26,8 @@ export class ProductoLocalDataSource {
       sql: `
         INSERT OR REPLACE INTO productos_cache (
           id, codigo, nombre, descripcion, categoria_id, categoria_nombre,
-          unidad_nombre, stock_minimo, activo, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          unidad_nombre, stock_minimo, stock_seguridad, activo, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         p.id,
@@ -37,6 +38,7 @@ export class ProductoLocalDataSource {
         p.categoriaNombre,
         p.unidadNombre,
         p.stockMinimo,
+        p.stockSeguridad ?? 0,
         p.activo ? 1 : 0,
         p.createdAt.toISOString(),
         p.updatedAt.toISOString(),
@@ -86,6 +88,7 @@ export class ProductoLocalDataSource {
       categoriaNombre: row.categoria_nombre,
       unidadNombre: row.unidad_nombre,
       stockMinimo: row.stock_minimo ?? 0,
+      stockSeguridad: row.stock_seguridad ?? 0,
       activo: row.activo === 1,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),

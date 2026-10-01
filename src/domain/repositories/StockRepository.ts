@@ -2,7 +2,7 @@
  * Repository Interface: StockRepository
  * Define las operaciones sobre el stock derivado (cache local)
  */
-import { StockItem } from '../entities';
+import { StockItem, NivelStock } from '../entities';
 
 export interface StockRepository {
   /**
@@ -21,4 +21,14 @@ export interface StockRepository {
    * Guarda el stock localmente (purge + replace)
    */
   guardarStockLocal(items: StockItem[]): Promise<void>;
+
+  /**
+   * Reemplaza los niveles de stock por producto/almacén (safety stock — P2)
+   */
+  reemplazarNiveles(niveles: NivelStock[]): Promise<void>;
+
+  /**
+   * Niveles de stock cacheados de un almacén
+   */
+  obtenerNivelesPorAlmacen(almacenId: string): Promise<NivelStock[]>;
 }

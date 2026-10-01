@@ -7,3 +7,4 @@ export * from './RegistrarEntradaUseCase';
 export * from './RegistrarSalidaUseCase';
 export * from './SincronizarUseCase';
 export * from './ObtenerResumenAlmacenUseCase';
+export * from './ObtenerHistorialProductoUseCase';

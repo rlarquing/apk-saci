@@ -7,3 +7,4 @@
  */
 export * from './database';
 export * from './network/NetworkService';
+export * from './alerts/AlertasLocales';

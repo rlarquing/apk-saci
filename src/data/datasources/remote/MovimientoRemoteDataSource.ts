@@ -12,6 +12,7 @@ import {
   ApiResponseDto,
   RegistroDiarioDto,
   StockApiDto,
+  MovimientoKardexApiDto,
 } from '../../dtos';
 
 export class MovimientoRemoteDataSource {
@@ -59,5 +60,19 @@ export class MovimientoRemoteDataSource {
       '/api/movimiento-inventario/stock'
     );
     return response.data;
+  }
+
+  /**
+   * Timeline de movimientos de un producto (backlog P2).
+   * GET /api/movimiento-inventario?productoId=…&limit=100
+   * El API responde un objeto Pagination { items, meta, links }.
+   */
+  async obtenerMovimientosProducto(productoId: string): Promise<MovimientoKardexApiDto[]> {
+    const response = await networkService.get<any>(
+      `/api/movimiento-inventario?productoId=${encodeURIComponent(productoId)}&limit=100`
+    );
+    const data = response.data;
+    const items = Array.isArray(data) ? data : (data?.items ?? []);
+    return items as MovimientoKardexApiDto[];
   }
 }

@@ -247,6 +247,7 @@ export class ProductoMapper {
       categoriaNombre: dto.categoriaNombre ?? null,
       unidadNombre: dto.unidadNombre ?? null,
       stockMinimo: dto.stockMinimo ?? 0,
+      stockSeguridad: dto.stockSeguridad ?? 0,
       activo: dto.activo,
       createdAt: dto.createdAt ? new Date(dto.createdAt) : new Date(),
       updatedAt: dto.updatedAt ? new Date(dto.updatedAt) : new Date(),

@@ -18,7 +18,7 @@ import { MovimientoRepository } from '@/src/domain';
 import { SyncRepository } from '@/src/domain';
 import { ProductoRepository } from '@/src/domain';
 import { StockRepository } from '@/src/domain';
-import { ResumenAlmacen, DetalleCategoria } from '../entities';
+import { ResumenAlmacen, DetalleCategoria, ItemReponer } from '../entities';
 
 export class ObtenerResumenAlmacenUseCase {
   constructor(
@@ -32,9 +32,12 @@ export class ObtenerResumenAlmacenUseCase {
     // 1. Base: ledger local del teléfono (siempre disponible, siempre fresco)
     const resumenLocal = await this.movimientoRepository.obtenerResumenLocal(almacenId);
 
-    // 2. Alertas de stock bajo mínimo (siempre desde caches locales)
-    const alertas = await this.contarBajoMinimo(almacenId);
-    resumenLocal.alertasBajoMinimo = alertas;
+    // 2. Alertas de stock (siempre desde caches locales): umbral efectivo
+    //    nivel_stock producto/almacén si existe; si no, global del producto
+    const { bajoMinimo, enReorden, items } = await this.contarBajoUmbral(almacenId);
+    resumenLocal.alertasBajoMinimo = bajoMinimo;
+    resumenLocal.alertasReorden = enReorden;
+    resumenLocal.itemsReponer = items;
 
     // 3. Intentar enriquecer con el registro diario del servidor
     const hayConexion = await this.syncRepository.hayConexion();
@@ -53,28 +56,68 @@ export class ObtenerResumenAlmacenUseCase {
   }
 
   /**
-   * Cuenta los productos del almacen cuyo stock cacheado quedó por debajo
-   * del stock mínimo del catálogo.
+   * Productos del almacén por debajo del punto de reorden (backlog P2).
+   * Umbral efectivo: nivel_stock (producto+almacén) si existe; si no, los
+   * globales del producto. Devuelve conteos por estado y la lista ordenada
+   * por criticidad (BAJO_MINIMO primero, luego menor stock relativo).
    */
-  private async contarBajoMinimo(almacenId: string): Promise<number> {
+  private async contarBajoUmbral(almacenId: string): Promise<{
+    bajoMinimo: number;
+    enReorden: number;
+    items: ItemReponer[];
+  }> {
     try {
-      const [stockItems, productos] = await Promise.all([
+      const [stockItems, productos, niveles] = await Promise.all([
         this.stockRepository.obtenerStockPorAlmacen(almacenId),
         this.productoRepository.obtenerProductosLocal(),
+        this.stockRepository.obtenerNivelesPorAlmacen(almacenId),
       ]);
 
-      const minimos = new Map(productos.map(p => [p.id, p.stockMinimo]));
+      const productosMap = new Map(productos.map(p => [p.id, p]));
+      const nivelesMap = new Map(
+        niveles.map(n => [`${n.productoId}|${n.almacenId}`, n])
+      );
 
-      let alertas = 0;
+      const items: ItemReponer[] = [];
       for (const item of stockItems) {
-        const minimo = minimos.get(item.productoId);
-        if (minimo !== undefined && item.stock < minimo) {
-          alertas++;
+        const producto = productosMap.get(item.productoId);
+        if (!producto) continue;
+
+        // Umbral efectivo: nivel específico > globales del producto
+        const nivel = nivelesMap.get(`${item.productoId}|${almacenId}`);
+        const stockMinimo = nivel ? nivel.stockMinimo : (producto.stockMinimo ?? 0);
+        const stockSeguridad = nivel ? nivel.stockSeguridad : (producto.stockSeguridad ?? 0);
+        const puntoReorden = stockMinimo + stockSeguridad;
+
+        if (item.stock < puntoReorden) {
+          items.push({
+            productoId: item.productoId,
+            productoCodigo: producto.codigo,
+            productoNombre: producto.nombre,
+            stock: item.stock,
+            stockMinimo,
+            puntoReorden,
+            sugerido: Math.max(puntoReorden - item.stock, 0),
+            estado: item.stock < stockMinimo ? 'BAJO_MINIMO' : 'REORDEN',
+          });
         }
       }
-      return alertas;
+
+      // Criticidad: bajo mínimo primero, luego déficit relativo más grave
+      items.sort((a, b) => {
+        if (a.estado !== b.estado) return a.estado === 'BAJO_MINIMO' ? -1 : 1;
+        const defA = b.puntoReorden > 0 ? b.stock / b.puntoReorden : 1;
+        const defB = a.puntoReorden > 0 ? a.stock / a.puntoReorden : 1;
+        return defA - defB;
+      });
+
+      return {
+        bajoMinimo: items.filter(i => i.estado === 'BAJO_MINIMO').length,
+        enReorden: items.filter(i => i.estado === 'REORDEN').length,
+        items: items.slice(0, 10),
+      };
     } catch {
-      return 0;
+      return { bajoMinimo: 0, enReorden: 0, items: [] };
     }
   }
 
@@ -95,6 +138,8 @@ export class ObtenerResumenAlmacenUseCase {
         local.detalleCategorias || []
       ),
       alertasBajoMinimo: local.alertasBajoMinimo ?? 0,
+      alertasReorden: local.alertasReorden ?? 0,
+      itemsReponer: local.itemsReponer ?? [],
     };
   }
 

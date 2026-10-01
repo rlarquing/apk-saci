@@ -24,6 +24,10 @@ export default function MainLayout() {
         options={{ title: 'Conteos Cíclicos', headerShown: true }}
       />
       <Stack.Screen
+        name="historial"
+        options={{ title: 'Historial por Producto', headerShown: true }}
+      />
+      <Stack.Screen
         name="conteo-activo"
         options={{ title: 'Conteo en curso', headerShown: true }}
       />

@@ -171,6 +171,8 @@ Endpoints consumidos por la app (prefijo global `/api`):
 | `/api/movimiento-inventario/entrada` | POST | Registrar entrada (`qrCodigo|productoId, almacenId, cantidad`) |
 | `/api/movimiento-inventario/salida` | POST | Registrar salida (valida stock suficiente) |
 | `/api/movimiento-inventario/stock` | GET | Stock derivado por producto/almacén |
+| `/api/movimiento-inventario?productoId=&limit=` | GET | Timeline de movimientos de un producto (historial — P2) |
+| `/api/nivel-stock?sinPaginacion=true` | GET | Niveles de stock por producto/almacén (safety stock — P2) |
 | `/api/registro-diario/actual/:almacenId` | GET | Resumen del día (totalEntradas/totalSalidas/detalleCategorias) |
 | `/api/producto?sinPaginacion=true` | GET | Catálogo de productos (SKU `PRD-XXXXXX`) |
 | `/api/nomenclador/almacen/listado/elementos` | GET | Catálogo de almacenes |
@@ -182,6 +184,10 @@ Endpoints consumidos por la app (prefijo global `/api`):
 Notas de contrato:
 
 - La mutación devuelve `ResponseDto { id, successStatus, message }`.
+- **P2**: modo ráfaga en el escáner (acumulador de sesión + confirmación por
+  lote), historial por producto (online-only), niveles de stock por almacén
+  (tabla `niveles_stock_cache`, DB v4) y notificaciones locales
+  (`expo-notifications`) cuando un producto cae bajo su punto de reorden.
 - El `POST /api/sync` exige `movimientosPendientes` **no vacío** y solo acepta
   `entrada|salida`: con la lista vacía la app refresca catálogos por GETs.
 - El `ValidationPipe` del API rechaza campos extra (`forbidNonWhitelisted`):

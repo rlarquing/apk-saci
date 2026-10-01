@@ -2,7 +2,7 @@
  * Escáner QR
  * Usa los tipos de Clean Architecture
  */
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,13 @@ interface QRScannerProps {
   onScanError: (error: string) => void;
   onClose: () => void;
   isLoading?: boolean;
+  /**
+   * Modo ráfaga (backlog P2): al cambiar este token el escáner se rearma
+   * automáticamente (sin pasar por el botón "Escanear Otro"), de modo que
+   * cada lectura vuelve directo a cámara. El guard interno de intervalo
+   * (2s) sigue evitando dobles lecturas del mismo código.
+   */
+  rearmarToken?: number;
 }
 
 export function QRScanner({
@@ -36,6 +43,7 @@ export function QRScanner({
   onScanError,
   onClose,
   isLoading = false,
+  rearmarToken,
 }: QRScannerProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
@@ -63,6 +71,14 @@ export function QRScanner({
   const handleRescan = () => {
     setScanned(false);
   };
+
+  // Rearme automático para el modo ráfaga: cada acumulación dispara un
+  // nuevo token y la cámara queda lista de inmediato.
+  useEffect(() => {
+    if (rearmarToken !== undefined) {
+      setScanned(false);
+    }
+  }, [rearmarToken]);
 
   if (!permission) {
     return (

@@ -3,7 +3,7 @@
  * Implementa la interfaz del dominio sobre el cache local de stock
  */
 import { StockRepository } from '@/src/domain';
-import { StockItem } from '@/src/domain';
+import { StockItem, NivelStock } from '@/src/domain';
 import { StockLocalDataSource } from '@/src/data/datasources/local/StockLocalDataSource';
 
 export class StockRepositoryImpl implements StockRepository {
@@ -21,5 +21,13 @@ export class StockRepositoryImpl implements StockRepository {
 
   async guardarStockLocal(items: StockItem[]): Promise<void> {
     await this.localDataSource.guardarStock(items);
+  }
+
+  async reemplazarNiveles(niveles: NivelStock[]): Promise<void> {
+    await this.localDataSource.reemplazarNiveles(niveles);
+  }
+
+  async obtenerNivelesPorAlmacen(almacenId: string): Promise<NivelStock[]> {
+    return await this.localDataSource.obtenerNivelesPorAlmacen(almacenId);
   }
 }

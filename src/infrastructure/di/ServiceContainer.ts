@@ -25,6 +25,7 @@ import { CategoriaRemoteDataSource } from '../../data/datasources/remote/Categor
 import { SyncRemoteDataSource } from '../../data/datasources/remote/SyncRemoteDataSource';
 import { AlmacenRemoteDataSource } from '../../data/datasources/remote/AlmacenRemoteDataSource';
 import { ConteoInventarioRemoteDataSource } from '../../data/datasources/remote/ConteoInventarioRemoteDataSource';
+import { NivelStockRemoteDataSource } from '../../data/datasources/remote/NivelStockRemoteDataSource';
 
 // Repository Implementations
 import { AuthRepositoryImpl } from '../../data/repositories/AuthRepositoryImpl';
@@ -44,6 +45,7 @@ import { RegistrarEntradaUseCase } from '../../domain/usecases/RegistrarEntradaU
 import { RegistrarSalidaUseCase } from '../../domain/usecases/RegistrarSalidaUseCase';
 import { SincronizarUseCase } from '../../domain/usecases/SincronizarUseCase';
 import { ObtenerResumenAlmacenUseCase } from '../../domain/usecases/ObtenerResumenAlmacenUseCase';
+import { ObtenerHistorialProductoUseCase } from '../../domain/usecases/ObtenerHistorialProductoUseCase';
 import {
   CancelarConteoUseCase,
   CerrarConteoUseCase,
@@ -82,6 +84,7 @@ export class ServiceContainer {
   private categoriaRemoteDataSource!: CategoriaRemoteDataSource;
   private syncRemoteDataSource!: SyncRemoteDataSource;
   private almacenRemoteDataSource!: AlmacenRemoteDataSource;
+  private nivelStockRemoteDataSource!: NivelStockRemoteDataSource;
 
   // Repositories
   private authRepository!: AuthRepositoryImpl;
@@ -108,6 +111,7 @@ export class ServiceContainer {
   private registrarSalidaUseCase!: RegistrarSalidaUseCase;
   private sincronizarUseCase!: SincronizarUseCase;
   private obtenerResumenAlmacenUseCase!: ObtenerResumenAlmacenUseCase;
+  private obtenerHistorialProductoUseCase!: ObtenerHistorialProductoUseCase;
 
   private constructor() {}
 
@@ -151,6 +155,7 @@ export class ServiceContainer {
     this.syncRemoteDataSource = new SyncRemoteDataSource();
     this.almacenRemoteDataSource = new AlmacenRemoteDataSource();
     this.conteoInventarioRemoteDataSource = new ConteoInventarioRemoteDataSource();
+    this.nivelStockRemoteDataSource = new NivelStockRemoteDataSource();
 
     // Inicializar Repositories
     this.authRepository = new AuthRepositoryImpl(
@@ -181,7 +186,8 @@ export class ServiceContainer {
       this.categoriaRemoteDataSource,
       this.productoLocalDataSource,
       this.stockLocalDataSource,
-      this.categoriaLocalDataSource
+      this.categoriaLocalDataSource,
+      this.nivelStockRemoteDataSource
     );
     this.categoriaRepository = new CategoriaRepositoryImpl(
       this.categoriaLocalDataSource,
@@ -227,6 +233,9 @@ export class ServiceContainer {
     this.contarProductoUseCase = new ContarProductoUseCase(this.conteoRepository);
     this.cerrarConteoUseCase = new CerrarConteoUseCase(this.conteoRepository);
     this.cancelarConteoUseCase = new CancelarConteoUseCase(this.conteoRepository);
+    this.obtenerHistorialProductoUseCase = new ObtenerHistorialProductoUseCase(
+      this.movimientoRemoteDataSource
+    );
 
     // Cargar configuración guardada
     const savedApiUrl = await this.configLocalDataSource.obtenerApiUrl();
@@ -270,6 +279,7 @@ export class ServiceContainer {
   get contarProducto() { return this.contarProductoUseCase; }
   get cerrarConteo() { return this.cerrarConteoUseCase; }
   get cancelarConteo() { return this.cancelarConteoUseCase; }
+  get historialProducto() { return this.obtenerHistorialProductoUseCase; }
 
   // DataSources directos (para casos especiales)
   get localAuth() { return this.authLocalDataSource; }
@@ -338,6 +348,7 @@ export class ServiceContainer {
     await executeUpdate('DELETE FROM qrs_cache');
     await executeUpdate('DELETE FROM productos_cache');
     await executeUpdate('DELETE FROM stock_cache');
+    await executeUpdate('DELETE FROM niveles_stock_cache');
     await executeUpdate('DELETE FROM categorias_cache');
     await executeUpdate('DELETE FROM almacenes_cache');
     await executeUpdate('DELETE FROM usuarios_offline');

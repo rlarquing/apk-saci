@@ -22,6 +22,21 @@ export interface DetalleCategoria {
 }
 
 /**
+ * Producto que requiere reposición (backlog P2): estado BAJO_MINIMO o REORDEN
+ * respecto a su umbral efectivo (nivel por almacén o global del producto).
+ */
+export interface ItemReponer {
+  productoId: string;
+  productoCodigo: string;
+  productoNombre: string;
+  stock: number;
+  stockMinimo: number;
+  puntoReorden: number;
+  sugerido: number;
+  estado: 'BAJO_MINIMO' | 'REORDEN';
+}
+
+/**
  * Resumen de movimientos del día en un almacen.
  * Base: GET /api/registro-diario/actual/:almacenId (totalEntradas/totalSalidas/
  * detalleCategorias). En offline se calcula desde el ledger local y se hace
@@ -37,4 +52,11 @@ export interface ResumenAlmacen {
    * el registro diario del API no lo trae.
    */
   alertasBajoMinimo?: number;
+  /**
+   * Productos bajo el punto de reorden pero por encima del mínimo
+   * (reponer pronto — backlog P2).
+   */
+  alertasReorden?: number;
+  /** Lista consolidada de productos a reponer (máx. 10, ordenada por criticidad) */
+  itemsReponer?: ItemReponer[];
 }

@@ -12,10 +12,25 @@ export interface Producto {
   categoriaId: string | null;
   categoriaNombre: string | null;
   unidadNombre: string | null;
+  /** Stock mínimo global (fallback del nivel por almacén) */
   stockMinimo: number;
+  /** Stock de seguridad global (fallback del nivel por almacén) */
+  stockSeguridad: number;
   activo: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * Nivel de stock por producto y almacén (safety stock — backlog P2).
+ * Punto de reorden = stockMinimo + stockSeguridad. Tiene prioridad sobre
+ * los umbrales globales del producto.
+ */
+export interface NivelStock {
+  productoId: string;
+  almacenId: string;
+  stockMinimo: number;
+  stockSeguridad: number;
 }
 
 /**

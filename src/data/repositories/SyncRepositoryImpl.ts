@@ -17,6 +17,7 @@ import { CategoriaRemoteDataSource } from '@/src/data/datasources/remote/Categor
 import { ProductoLocalDataSource } from '@/src/data/datasources/local/ProductoLocalDataSource';
 import { StockLocalDataSource } from '@/src/data/datasources/local/StockLocalDataSource';
 import { CategoriaLocalDataSource } from '@/src/data/datasources/local/CategoriaLocalDataSource';
+import { NivelStockRemoteDataSource } from '@/src/data/datasources/remote/NivelStockRemoteDataSource';
 import { networkService } from '@/src/infrastructure';
 import {
   SyncRequestDto,
@@ -36,6 +37,7 @@ export class SyncRepositoryImpl implements SyncRepository {
     private productoLocalDataSource: ProductoLocalDataSource,
     private stockLocalDataSource: StockLocalDataSource,
     private categoriaLocalDataSource: CategoriaLocalDataSource,
+    private nivelStockRemoteDataSource?: NivelStockRemoteDataSource,
   ) {}
 
   /**
@@ -123,6 +125,7 @@ export class SyncRepositoryImpl implements SyncRepository {
               categoriaNombre: p.categoriaNombre,
               unidadNombre: p.unidadNombre,
               stockMinimo: p.stockMinimo,
+              stockSeguridad: p.stockSeguridad ?? 0,
               activo: p.activo,
               createdAt: p.updatedAt,
               updatedAt: p.updatedAt,
@@ -149,7 +152,23 @@ export class SyncRepositoryImpl implements SyncRepository {
       }
     }
 
-    // 3. Categorías
+    // 3. Niveles de stock por producto/almacén (safety stock — P2)
+    if (response.niveles && response.niveles.length > 0) {
+      try {
+        await this.stockLocalDataSource.reemplazarNiveles(
+          response.niveles.map(n => ({
+            productoId: n.productoId,
+            almacenId: n.almacenId,
+            stockMinimo: n.stockMinimo,
+            stockSeguridad: n.stockSeguridad,
+          }))
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    // 4. Categorías
     if (response.categorias && response.categorias.length > 0) {
       try {
         await this.categoriaLocalDataSource.limpiarTiposMedio();
@@ -243,6 +262,25 @@ export class SyncRepositoryImpl implements SyncRepository {
       categorias = select.length;
     } catch {
       // ignore
+    }
+
+    // 4. Niveles de stock (GET /api/nivel-stock — safety stock P2)
+    if (this.nivelStockRemoteDataSource) {
+      try {
+        const nivelesDto = await this.nivelStockRemoteDataSource.obtenerNiveles();
+        if (nivelesDto.length > 0) {
+          await this.stockLocalDataSource.reemplazarNiveles(
+            nivelesDto.map(n => ({
+              productoId: n.productoId,
+              almacenId: n.almacenId,
+              stockMinimo: n.stockMinimo,
+              stockSeguridad: n.stockSeguridad,
+            }))
+          );
+        }
+      } catch {
+        // ignore
+      }
     }
 
     return { productos, categorias, stock };

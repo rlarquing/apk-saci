@@ -5,7 +5,7 @@
  */
 
 export const DATABASE_NAME = 'saci_offline.db';
-export const DATABASE_VERSION = 3;
+export const DATABASE_VERSION = 4;
 
 export const createTablesSQL = `
   -- Tabla de usuarios para login offline
@@ -89,9 +89,21 @@ export const createTablesSQL = `
     categoria_nombre TEXT,
     unidad_nombre TEXT,
     stock_minimo REAL DEFAULT 0,
+    stock_seguridad REAL DEFAULT 0,
     activo INTEGER DEFAULT 1,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
+  );
+
+  -- Niveles de stock por producto/almacén (safety stock — backlog P2)
+  -- Punto de reorden = stock_minimo + stock_seguridad. Llega con cada sync.
+  CREATE TABLE IF NOT EXISTS niveles_stock_cache (
+    producto_id TEXT NOT NULL,
+    almacen_id TEXT NOT NULL,
+    stock_minimo REAL NOT NULL DEFAULT 0,
+    stock_seguridad REAL NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (producto_id, almacen_id)
   );
 
   -- Tabla de stock derivado (cache)
@@ -140,6 +152,7 @@ export const createTablesSQL = `
   CREATE INDEX IF NOT EXISTS idx_qrs_codigo ON qrs_cache(codigo);
   CREATE INDEX IF NOT EXISTS idx_qrs_estado ON qrs_cache(estado);
   CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos_cache(codigo);
+  CREATE INDEX IF NOT EXISTS idx_niveles_almacen ON niveles_stock_cache(almacen_id);
   CREATE INDEX IF NOT EXISTS idx_stock_producto ON stock_cache(producto_id);
   CREATE INDEX IF NOT EXISTS idx_stock_almacen ON stock_cache(almacen_id);
   CREATE INDEX IF NOT EXISTS idx_pendientes_sincronizado ON movimientos_pendientes(sincronizado);
