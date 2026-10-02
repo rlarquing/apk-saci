@@ -144,6 +144,8 @@ export class MovimientoMapper {
       cantidad: data.cantidad,
       ...(data.fecha ? { fecha: data.fecha } : {}),
       ...(data.observaciones ? { observaciones: data.observaciones } : {}),
+      ...(data.lote ? { lote: data.lote } : {}),
+      ...(data.fechaCaducidad ? { fechaCaducidad: data.fechaCaducidad } : {}),
     };
   }
 

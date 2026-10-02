@@ -98,4 +98,46 @@ export class StockLocalDataSource {
       stockSeguridad: r.stock_seguridad ?? 0,
     }));
   }
+
+  // ==================== BINS (producto-ubicación — P3) ====================
+
+  /**
+   * Reemplaza todos los bins cacheados (purge + replace en transacción).
+   * Un bin es la ubicación física de un producto dentro de un almacén:
+   * llega de GET /api/producto-ubicacion y de la respuesta del sync.
+   */
+  async reemplazarBins(
+    bins: Array<{ productoId: string; almacenId: string; ubicacionNombre: string }>
+  ): Promise<void> {
+    await this.limpiarBins();
+    if (bins.length === 0) return;
+    const now = new Date().toISOString();
+    const operations = bins.map(b => ({
+      sql: `
+        INSERT OR REPLACE INTO producto_ubicacion_cache (
+          producto_id, almacen_id, ubicacion_nombre, updated_at
+        ) VALUES (?, ?, ?, ?)
+      `,
+      params: [b.productoId, b.almacenId, b.ubicacionNombre, now],
+    }));
+    await executeTransaction(operations);
+  }
+
+  async limpiarBins(): Promise<void> {
+    await executeUpdate('DELETE FROM producto_ubicacion_cache');
+  }
+
+  /**
+   * Ubicación (bin) cacheada de un producto en un almacén.
+   * Retorna null si el producto no tiene bin asignado.
+   */
+  async obtenerBin(productoId: string, almacenId: string): Promise<string | null> {
+    const row = await executeQueryFirst<{ ubicacion_nombre: string }>(
+      `SELECT ubicacion_nombre FROM producto_ubicacion_cache
+       WHERE producto_id = ? AND almacen_id = ? LIMIT 1`,
+      [productoId, almacenId]
+    );
+
+    return row?.ubicacion_nombre || null;
+  }
 }

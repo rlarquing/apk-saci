@@ -14,7 +14,7 @@ import { MovimientoRepository } from '@/src/domain';
 import { QRRepository } from '@/src/domain';
 import { ProductoRepository } from '@/src/domain';
 import { StockRepository } from '@/src/domain';
-import { ResultadoOperacion } from '../entities';
+import { ResultadoOperacion, LoteInfo } from '../entities';
 import { esCodigoSKU } from './RegistrarEntradaUseCase';
 
 export class RegistrarSalidaUseCase {
@@ -29,7 +29,8 @@ export class RegistrarSalidaUseCase {
     codigo: string,
     almacenId: string,
     cantidad: number,
-    observaciones?: string
+    observaciones?: string,
+    loteInfo?: LoteInfo
   ): Promise<ResultadoOperacion> {
     if (!almacenId) {
       return {
@@ -108,12 +109,16 @@ export class RegistrarSalidaUseCase {
       }
     }
 
+    // El API también acepta lote/fechaCaducidad en la salida (P3); la APK
+    // solo los captura en la entrada, pero el parámetro se propaga igual.
     const resultado = await this.movimientoRepository.registrarSalida({
       qrCodigo,
       productoId,
       almacenId,
       cantidad,
       observaciones,
+      ...(loteInfo?.lote ? { lote: loteInfo.lote } : {}),
+      ...(loteInfo?.fechaCaducidad ? { fechaCaducidad: loteInfo.fechaCaducidad } : {}),
     });
 
     return resultado;

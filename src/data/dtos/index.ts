@@ -76,6 +76,10 @@ export interface RegistrarMovimientoRequestDto {
   /** Fecha real en ISO (solo sincronización offline; opcional) */
   fecha?: string;
   observaciones?: string;
+  /** Lote de la mercancía (≤50; opcional, backlog P3) */
+  lote?: string;
+  /** Caducidad del lote en ISO (opcional, backlog P3) */
+  fechaCaducidad?: string;
 }
 
 /** Response genérica de la API (ResponseDto) */
@@ -195,6 +199,8 @@ export interface MovimientoPendienteSyncDto {
     cantidad: number;
     fecha?: string;
     observaciones?: string;
+    lote?: string;
+    fechaCaducidad?: string;
   };
   createdAt: string;
 }
@@ -218,6 +224,24 @@ export interface NivelStockSyncDto {
   almacenId: string;
   stockMinimo: number;
   stockSeguridad: number;
+}
+
+/** Bin (producto-ubicación) de la respuesta del sync (backlog P3). */
+export interface UbicacionProductoSyncDto {
+  productoId: string;
+  almacenId: string;
+  ubicacionNombre: string;
+}
+
+/** Lote vencido o próximo a vencer en la respuesta del sync (backlog P3). */
+export interface LoteProximoSyncDto {
+  productoId: string;
+  productoCodigo: string;
+  productoNombre: string;
+  lote: string | null;
+  fechaCaducidad?: string | null;
+  stock: number;
+  diasParaVencer: number;
 }
 
 /** Nivel de stock leído del GET /api/nivel-stock (ReadNivelStockDto). */
@@ -260,6 +284,8 @@ export interface SyncResponseDto {
   stock: StockSyncDto[];
   categorias: CategoriaSyncDto[];
   niveles?: NivelStockSyncDto[];
+  bins?: UbicacionProductoSyncDto[];
+  lotesProximos?: LoteProximoSyncDto[];
 }
 
 export interface SyncErrorDto {
@@ -331,4 +357,40 @@ export interface MovimientoKardexApiDto {
   saldoResultante?: number | null;
   observaciones?: string | null;
   signoAjuste?: number | null;
+  /** Lote y caducidad del movimiento (backlog P3) */
+  lote?: string | null;
+  fechaCaducidad?: string | null;
+}
+
+/**
+ * Fila de GET /api/movimiento-inventario/lotes?diasProximo=30 (backlog P3).
+ * El body ES el array directo; estado deriva de la caducidad del lote.
+ */
+export interface LoteInventarioApiDto {
+  productoId: string;
+  productoCodigo: string;
+  productoNombre: string;
+  almacenNombre: string;
+  lote: string | null;
+  fechaCaducidad: string | null;
+  stock: number;
+  estado: 'VENCIDO' | 'PROXIMO' | 'OK' | 'SIN_CADUCIDAD';
+  diasParaVencer: number | null;
+}
+
+/**
+ * Fila de GET /api/producto-ubicacion?sinPaginacion=true (backlog P3):
+ * bins de TODOS los almacenes del usuario (el cliente filtra por almacén
+ * activo si hace falta).
+ */
+export interface UbicacionProductoApiDto {
+  id: string;
+  productoId: string;
+  productoCodigo: string;
+  productoNombre: string;
+  almacenId: string;
+  almacenNombre: string;
+  ubicacionId: string;
+  ubicacionNombre: string;
+  activo: boolean;
 }

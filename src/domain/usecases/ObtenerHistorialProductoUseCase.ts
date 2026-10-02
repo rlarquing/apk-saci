@@ -21,6 +21,8 @@ interface MovimientoKardexCrud {
   saldoResultante?: number | null;
   observaciones?: string | null;
   signoAjuste?: number | null;
+  lote?: string | null;
+  fechaCaducidad?: string | null;
 }
 
 /** Fila del timeline del producto. */
@@ -38,6 +40,10 @@ export interface MovimientoHistorial {
   saldoResultante?: number;
   observaciones?: string;
   signoAjuste?: number;
+  /** Lote del movimiento (backlog P3) */
+  lote?: string;
+  /** Caducidad del lote en ISO (backlog P3) */
+  fechaCaducidad?: string;
 }
 
 export interface ResultadoHistorial {
@@ -70,6 +76,8 @@ export class ObtenerHistorialProductoUseCase {
           saldoResultante: m.saldoResultante ?? undefined,
           observaciones: m.observaciones ?? undefined,
           signoAjuste: m.signoAjuste ?? undefined,
+          lote: m.lote ?? undefined,
+          fechaCaducidad: m.fechaCaducidad ?? undefined,
         })
       );
       return { exito: true, movimientos };

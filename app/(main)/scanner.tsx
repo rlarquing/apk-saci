@@ -33,6 +33,8 @@ interface InfoEscaneo {
   stockDisponible: number | null;
   /** Foto del producto (endpoint público del API; null si no tiene) */
   productoFotoUrl: string | null;
+  /** Bin (ubicación) del producto en el almacén activo (null si no tiene) */
+  binNombre: string | null;
 }
 
 /** Ítem acumulado en la sesión de ráfaga. */
@@ -45,6 +47,7 @@ interface ItemRafaga {
   cantidad: number;
   stockDisponible: number | null;
   productoFotoUrl: string | null;
+  binNombre: string | null;
 }
 
 interface ResumenLote {
@@ -136,6 +139,10 @@ export default function ScannerScreen() {
       const stock = almacenId
         ? await serviceContainer.localStock.obtenerStock(producto.id, almacenId)
         : null;
+      const bin =
+        almacenId
+          ? await serviceContainer.localStock.obtenerBin(producto.id, almacenId)
+          : null;
       return {
         codigo,
         productoId: producto.id,
@@ -143,6 +150,7 @@ export default function ScannerScreen() {
         productoCodigo: producto.codigo,
         stockDisponible: stock,
         productoFotoUrl: urlFotoProducto(producto.id),
+        binNombre: bin,
       };
     }
 
@@ -158,6 +166,9 @@ export default function ScannerScreen() {
     const stock = qr?.productoId
       ? await serviceContainer.localStock.obtenerStock(qr.productoId, almacenId)
       : null;
+    const bin = qr?.productoId
+      ? await serviceContainer.localStock.obtenerBin(qr.productoId, almacenId)
+      : null;
     return {
       codigo: qr?.codigo || codigo,
       productoId: qr?.productoId || '',
@@ -165,6 +176,7 @@ export default function ScannerScreen() {
       productoCodigo: qr?.productoCodigo || '',
       stockDisponible: stock,
       productoFotoUrl: urlFotoProducto(qr?.productoId || ''),
+      binNombre: bin,
     };
   };
 
@@ -200,6 +212,7 @@ export default function ScannerScreen() {
           cantidad: nuevaCantidad,
           stockDisponible: info.stockDisponible,
           productoFotoUrl: info.productoFotoUrl,
+          binNombre: info.binNombre,
         },
       };
     });
@@ -255,10 +268,17 @@ export default function ScannerScreen() {
     }
   };
 
-  const handleConfirmarCantidad = async (cantidad: number) => {
+  /**
+   * Propaga la cantidad (y el lote/caducidad opcional de la ENTRADA — P3)
+   * hasta el use case. En ráfaga no hay lote: es conteo rápido sin captura.
+   */
+  const handleConfirmarCantidad = async (
+    cantidad: number,
+    loteInfo?: { lote?: string; fechaCaducidad?: string }
+  ) => {
     if (!escaneo) return;
     setCantidadVisible(false);
-    await executeOperacion(escaneo.codigo, operationType, cantidad);
+    await executeOperacion(escaneo.codigo, operationType, cantidad, loteInfo);
   };
 
   const handleCancelCantidad = () => {
@@ -409,7 +429,10 @@ export default function ScannerScreen() {
                     <Text style={styles.rafagaItemNombre} numberOfLines={1}>
                       {item.productoNombre || item.productoCodigo}
                     </Text>
-                    <Text style={styles.rafagaItemCodigo}>{item.productoCodigo}</Text>
+                    <Text style={styles.rafagaItemCodigo} numberOfLines={1}>
+                      {item.productoCodigo}
+                      {item.binNombre ? ` · Bin: ${item.binNombre}` : ''}
+                    </Text>
                   </View>
                   <TouchableOpacity
                     style={styles.rafagaBtn}
@@ -485,6 +508,7 @@ export default function ScannerScreen() {
         productoCodigo={escaneo?.productoCodigo || ''}
         stockDisponible={escaneo?.stockDisponible ?? null}
         productoFotoUrl={escaneo?.productoFotoUrl ?? null}
+        binNombre={escaneo?.binNombre ?? null}
         onCancel={handleCancelCantidad}
         onConfirm={handleConfirmarCantidad}
       />

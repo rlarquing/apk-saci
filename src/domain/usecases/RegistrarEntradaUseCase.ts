@@ -12,7 +12,7 @@
 import { MovimientoRepository } from '@/src/domain';
 import { QRRepository } from '@/src/domain';
 import { ProductoRepository } from '@/src/domain';
-import { ResultadoOperacion } from '../entities';
+import { ResultadoOperacion, LoteInfo } from '../entities';
 
 /** Prefijo del SKU autogenerado por el API para productos */
 const PREFIJO_SKU = 'PRD-';
@@ -32,7 +32,8 @@ export class RegistrarEntradaUseCase {
     codigo: string,
     almacenId: string,
     cantidad: number,
-    observaciones?: string
+    observaciones?: string,
+    loteInfo?: LoteInfo
   ): Promise<ResultadoOperacion> {
     if (!almacenId) {
       return {
@@ -98,12 +99,15 @@ export class RegistrarEntradaUseCase {
     // Registrar. El repository degrada solo a offline si la red falla
     // a mitad de la llamada (timeout/5xx tras un health check exitoso):
     // la operación siempre queda persistida en el teléfono.
+    // El lote/caducidad (P3) solo viaja si el operario lo capturó.
     const resultado = await this.movimientoRepository.registrarEntrada({
       qrCodigo,
       productoId,
       almacenId,
       cantidad,
       observaciones,
+      ...(loteInfo?.lote ? { lote: loteInfo.lote } : {}),
+      ...(loteInfo?.fechaCaducidad ? { fechaCaducidad: loteInfo.fechaCaducidad } : {}),
     });
 
     // Actualización optimista del cache: la entrada asigna la etiqueta al

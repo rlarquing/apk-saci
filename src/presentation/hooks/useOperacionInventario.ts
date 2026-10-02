@@ -5,7 +5,8 @@
 import { useState, useCallback } from 'react';
 import {
   TipoOperacion,
-  ResultadoOperacion
+  ResultadoOperacion,
+  LoteInfo
 } from '@/src/domain';
 import { serviceContainer } from '@/src/infrastructure/di/ServiceContainer';
 import { useAuth } from '@/src/presentation/contexts/AuthContext';
@@ -16,8 +17,15 @@ interface UseOperacionInventarioReturn {
   /**
    * Ejecuta la operación sobre un código escaneado (etiqueta QR-XXXXXX) o
    * tecleado (SKU PRD-XXXXXX), con la cantidad capturada en el modal.
+   * `loteInfo` (opcional, P3) solo lo envía la ENTRADA cuando el operario
+   * capturó lote/caducidad; si no viene, el payload queda igual que hoy.
    */
-  executeOperacion: (codigo: string, operation: TipoOperacion, cantidad: number) => Promise<void>;
+  executeOperacion: (
+    codigo: string,
+    operation: TipoOperacion,
+    cantidad: number,
+    loteInfo?: LoteInfo
+  ) => Promise<void>;
   reset: () => void;
 }
 
@@ -27,7 +35,7 @@ export function useOperacionInventario(): UseOperacionInventarioReturn {
   const [result, setResult] = useState<ResultadoOperacion | null>(null);
 
   const executeOperacion = useCallback(
-    async (codigo: string, operation: TipoOperacion, cantidad: number) => {
+    async (codigo: string, operation: TipoOperacion, cantidad: number, loteInfo?: LoteInfo) => {
       if (!sesion?.almacenSeleccionado || !sesion.usuario) {
         setResult({
           exito: false,
@@ -48,13 +56,17 @@ export function useOperacionInventario(): UseOperacionInventarioReturn {
           resultado = await serviceContainer.registrarEntrada.execute(
             codigo,
             sesion.almacenSeleccionado.id,
-            cantidad
+            cantidad,
+            undefined,
+            loteInfo
           );
         } else {
           resultado = await serviceContainer.registrarSalida.execute(
             codigo,
             sesion.almacenSeleccionado.id,
-            cantidad
+            cantidad,
+            undefined,
+            loteInfo
           );
         }
 

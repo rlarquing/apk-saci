@@ -3,6 +3,10 @@
  * Paso intermedio del escáner: tras validar la etiqueta (o resolver el SKU),
  * el operador indica cuántas unidades entran o salen. La cantidad es LA
  * diferencia central respecto de un ticket de un solo uso.
+ *
+ * Backlog P3: la ficha muestra el bin del producto y, solo en la ENTRADA,
+ * dos campos opcionales de lote y caducidad. Si el operario no los rellena,
+ * el payload queda igual que hoy (captura de lote es opcional).
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -18,11 +22,15 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../src/shared/constants';
-import { TipoOperacion } from '../src/domain/entities';
+import { TipoOperacion, LoteInfo } from '../src/domain/entities';
 
 /** Límite de cantidad del API: CreateEntradaDto (0.01 - 999999.99) */
 const MAX_CANTIDAD = 999999.99;
 const REGEX_CANTIDAD = /^\d{1,6}([.,]\d{1,2})?$/;
+/** Límite del lote del API: CreateEntradaDto (lote ≤50) */
+const MAX_LOTE = 50;
+/** Formato de caducidad esperado del operador */
+const REGEX_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 interface CantidadModalProps {
   visible: boolean;
@@ -34,8 +42,10 @@ interface CantidadModalProps {
   stockDisponible: number | null;
   /** Foto del producto (endpoint público del API; null: sin foto) */
   productoFotoUrl?: string | null;
+  /** Bin (ubicación) del producto en el almacén activo (null: sin bin) */
+  binNombre?: string | null;
   onCancel: () => void;
-  onConfirm: (cantidad: number) => void;
+  onConfirm: (cantidad: number, loteInfo?: LoteInfo) => void;
 }
 
 export function CantidadModal({
@@ -46,16 +56,21 @@ export function CantidadModal({
   productoCodigo,
   stockDisponible,
   productoFotoUrl,
+  binNombre,
   onCancel,
   onConfirm,
 }: CantidadModalProps) {
   const [texto, setTexto] = useState('1');
   const [error, setError] = useState<string | null>(null);
+  const [loteTexto, setLoteTexto] = useState('');
+  const [fechaTexto, setFechaTexto] = useState('');
 
   useEffect(() => {
     if (visible) {
       setTexto('1');
       setError(null);
+      setLoteTexto('');
+      setFechaTexto('');
     }
   }, [visible]);
 
@@ -87,8 +102,34 @@ export function CantidadModal({
       return;
     }
 
+    // Lote/caducidad (P3): solo ENTRADA. Si el operario no los rellena no se
+    // envía nada (el payload queda igual que hoy).
+    let loteInfo: LoteInfo | undefined;
+    if (esEntrada) {
+      const lote = loteTexto.trim();
+      const fecha = fechaTexto.trim();
+
+      if (fecha) {
+        if (!REGEX_FECHA.test(fecha)) {
+          setError('Caducidad inválida: usa el formato AAAA-MM-DD');
+          return;
+        }
+        const fechaDate = new Date(fecha);
+        if (isNaN(fechaDate.getTime())) {
+          setError('Caducidad inválida: usa el formato AAAA-MM-DD');
+          return;
+        }
+        loteInfo = {
+          ...(lote ? { lote } : {}),
+          fechaCaducidad: fechaDate.toISOString(),
+        };
+      } else if (lote) {
+        loteInfo = { lote };
+      }
+    }
+
     setError(null);
-    onConfirm(cantidad);
+    onConfirm(cantidad, loteInfo);
   };
 
   return (
@@ -132,6 +173,14 @@ export function CantidadModal({
                 </Text>
               </View>
             ) : null}
+            {binNombre !== undefined && binNombre !== null && (
+              <View style={styles.productoRow}>
+                <MaterialCommunityIcons name="map-marker" size={16} color={COLORS.primary} />
+                <Text style={styles.productoText}>
+                  {binNombre ? `Bin: ${binNombre}` : 'Sin bin'}
+                </Text>
+              </View>
+            )}
             {!esEntrada && stockDisponible !== null && (
               <View style={styles.productoRow}>
                 <MaterialCommunityIcons name="clipboard-list" size={16} color={COLORS.warning} />
@@ -157,6 +206,40 @@ export function CantidadModal({
           />
 
           {error && <Text style={styles.errorText}>{error}</Text>}
+
+          {/* Lote y caducidad (opcional, solo ENTRADA — backlog P3) */}
+          {esEntrada && (
+            <View style={styles.loteContainer}>
+              <Text style={styles.loteLabel}>Lote (opcional)</Text>
+              <TextInput
+                style={styles.inputLote}
+                value={loteTexto}
+                onChangeText={t => {
+                  setLoteTexto(t);
+                  setError(null);
+                }}
+                placeholder="N.º de lote"
+                placeholderTextColor={COLORS.lightGray}
+                maxLength={MAX_LOTE}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+              <Text style={styles.loteLabel}>Caducidad (opcional)</Text>
+              <TextInput
+                style={styles.inputLote}
+                value={fechaTexto}
+                onChangeText={t => {
+                  setFechaTexto(t);
+                  setError(null);
+                }}
+                placeholder="AAAA-MM-DD"
+                placeholderTextColor={COLORS.lightGray}
+                keyboardType="numbers-and-punctuation"
+                maxLength={10}
+                autoCorrect={false}
+              />
+            </View>
+          )}
 
           {/* Botones */}
           <View style={styles.botones}>
@@ -258,6 +341,25 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     textAlign: 'center',
     marginBottom: 10,
+  },
+  loteContainer: {
+    marginBottom: 10,
+    gap: 4,
+  },
+  loteLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: COLORS.gray,
+  },
+  inputLote: {
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    fontSize: 15,
+    color: COLORS.primary,
+    backgroundColor: '#fafafa',
   },
   botones: {
     flexDirection: 'row',

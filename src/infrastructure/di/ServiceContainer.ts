@@ -290,6 +290,7 @@ export class ServiceContainer {
   get localConfig() { return this.configLocalDataSource; }
   get localCategoria() { return this.categoriaLocalDataSource; }
   get localAlmacen() { return this.almacenLocalDataSource; }
+  get remoteMovimiento() { return this.movimientoRemoteDataSource; }
 
   // Network
   get network() { return networkService; }
@@ -349,6 +350,7 @@ export class ServiceContainer {
     await executeUpdate('DELETE FROM productos_cache');
     await executeUpdate('DELETE FROM stock_cache');
     await executeUpdate('DELETE FROM niveles_stock_cache');
+    await executeUpdate('DELETE FROM producto_ubicacion_cache');
     await executeUpdate('DELETE FROM categorias_cache');
     await executeUpdate('DELETE FROM almacenes_cache');
     await executeUpdate('DELETE FROM usuarios_offline');
@@ -364,6 +366,8 @@ export class ServiceContainer {
       'qrs_cache',
       'productos_cache',
       'stock_cache',
+      'niveles_stock_cache',
+      'producto_ubicacion_cache',
       'categorias_cache',
       'almacenes_cache',
       'usuarios_offline',

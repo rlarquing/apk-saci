@@ -13,6 +13,7 @@ import {
   RegistroDiarioDto,
   StockApiDto,
   MovimientoKardexApiDto,
+  LoteInventarioApiDto,
 } from '../../dtos';
 
 export class MovimientoRemoteDataSource {
@@ -74,5 +75,20 @@ export class MovimientoRemoteDataSource {
     const data = response.data;
     const items = Array.isArray(data) ? data : (data?.items ?? []);
     return items as MovimientoKardexApiDto[];
+  }
+
+  /**
+   * Lotes con caducidad (backlog P3).
+   * GET /api/movimiento-inventario/lotes?diasProximo=30 → el body ES el array
+   * directo de lotes con estado VENCIDO|PROXIMO|OK|SIN_CADUCIDAD. Sin filtros
+   * retorna los lotes de todos los almacenes del usuario (alcance del JWT).
+   * Lanza en fallo de red: el caller decide cómo degradar.
+   */
+  async obtenerLotes(diasProximo: number = 30): Promise<LoteInventarioApiDto[]> {
+    const response = await networkService.get<LoteInventarioApiDto[] | any>(
+      `/api/movimiento-inventario/lotes?diasProximo=${diasProximo}`
+    );
+    const data = response.data;
+    return Array.isArray(data) ? data : [];
   }
 }

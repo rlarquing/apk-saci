@@ -26,6 +26,9 @@ import { MovimientoHistorial, Producto } from '@/src/domain';
 
 const PREFIJO_SKU = /^PRD-[0-9A-Za-z]+$/i;
 
+/** Ámbar para caducidades próximas (≤30 días — backlog P3) */
+const AMBAR_VENCIMIENTO = '#b45309';
+
 const urlFotoProducto = (productoId: string): string | null => {
   if (!productoId) return null;
   const base = serviceContainer.network.getBaseUrl().replace(/\/$/, '');
@@ -54,6 +57,34 @@ const formatearFecha = (fecha: string): string => {
     });
   } catch {
     return fecha;
+  }
+};
+
+/** Caducidad en DD/MM/YYYY (badge del timeline — P3). */
+const formatearFechaCorta = (fecha: string): string => {
+  try {
+    const d = new Date(fecha);
+    return d.toLocaleDateString('es', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return fecha;
+  }
+};
+
+/** Color del badge de caducidad: rojo si vencido, ámbar si ≤30 días. */
+const colorCaducidad = (fechaCaducidad: string): string => {
+  try {
+    const dias = Math.ceil(
+      (new Date(fechaCaducidad).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    );
+    if (dias < 0) return COLORS.error;
+    if (dias <= 30) return AMBAR_VENCIMIENTO;
+    return 'rgba(255,255,255,0.55)';
+  } catch {
+    return 'rgba(255,255,255,0.55)';
   }
 };
 
@@ -134,6 +165,18 @@ export default function HistorialScreen() {
           </Text>
           {item.almacenDestinoNombre && (
             <Text style={styles.timelineMeta}>Destino: {item.almacenDestinoNombre}</Text>
+          )}
+          {(item.lote || item.fechaCaducidad) && (
+            <View style={styles.timelineLotes}>
+              {item.lote ? (
+                <Text style={styles.timelineLote}>Lote: {item.lote}</Text>
+              ) : null}
+              {item.fechaCaducidad ? (
+                <Text style={[styles.timelineLote, { color: colorCaducidad(item.fechaCaducidad) }]}>
+                  vence {formatearFechaCorta(item.fechaCaducidad)}
+                </Text>
+              ) : null}
+            </View>
           )}
           {item.observaciones ? (
             <Text style={styles.timelineObs} numberOfLines={2}>
@@ -329,6 +372,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontStyle: 'italic',
     marginTop: 2,
+  },
+  timelineLotes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 3,
+  },
+  timelineLote: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 11,
+    fontWeight: '600',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    overflow: 'hidden',
+    alignSelf: 'flex-start',
   },
   vacio: {
     color: 'rgba(255,255,255,0.5)',

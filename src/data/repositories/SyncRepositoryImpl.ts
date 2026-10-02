@@ -64,6 +64,8 @@ export class SyncRepositoryImpl implements SyncRepository {
             cantidad: m.data.cantidad,
             ...(m.data.fecha ? { fecha: m.data.fecha } : {}),
             ...(m.data.observaciones ? { observaciones: m.data.observaciones } : {}),
+            ...(m.data.lote ? { lote: m.data.lote } : {}),
+            ...(m.data.fechaCaducidad ? { fechaCaducidad: m.data.fechaCaducidad } : {}),
           },
           createdAt: m.createdAt.toISOString(),
         })),
@@ -168,7 +170,23 @@ export class SyncRepositoryImpl implements SyncRepository {
       }
     }
 
-    // 4. Categorías
+    // 4. Bins producto-ubicación (backlog P3): llegan de todos los almacenes
+    //    del usuario; obtenerBin filtra por producto+almacén al leer.
+    if (response.bins && response.bins.length > 0) {
+      try {
+        await this.stockLocalDataSource.reemplazarBins(
+          response.bins.map(b => ({
+            productoId: b.productoId,
+            almacenId: b.almacenId,
+            ubicacionNombre: b.ubicacionNombre,
+          }))
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    // 5. Categorías
     if (response.categorias && response.categorias.length > 0) {
       try {
         await this.categoriaLocalDataSource.limpiarTiposMedio();
@@ -281,6 +299,23 @@ export class SyncRepositoryImpl implements SyncRepository {
       } catch {
         // ignore
       }
+    }
+
+    // 5. Bins producto-ubicación (GET /api/producto-ubicacion — backlog P3)
+    try {
+      const binsDto = await this.productoRemoteDataSource.obtenerBins();
+      const binsActivos = binsDto.filter(b => b.activo);
+      if (binsActivos.length > 0) {
+        await this.stockLocalDataSource.reemplazarBins(
+          binsActivos.map(b => ({
+            productoId: b.productoId,
+            almacenId: b.almacenId,
+            ubicacionNombre: b.ubicacionNombre,
+          }))
+        );
+      }
+    } catch {
+      // ignore
     }
 
     return { productos, categorias, stock };

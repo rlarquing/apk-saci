@@ -5,7 +5,7 @@
  */
 
 export const DATABASE_NAME = 'saci_offline.db';
-export const DATABASE_VERSION = 4;
+export const DATABASE_VERSION = 5;
 
 export const createTablesSQL = `
   -- Tabla de usuarios para login offline
@@ -106,6 +106,17 @@ export const createTablesSQL = `
     PRIMARY KEY (producto_id, almacen_id)
   );
 
+  -- Bins por producto/almacén (ubicación de estantería — backlog P3)
+  -- Llega de GET /api/producto-ubicacion y del sync; el escáner lo muestra
+  -- en la ficha del producto escaneado.
+  CREATE TABLE IF NOT EXISTS producto_ubicacion_cache (
+    producto_id TEXT NOT NULL,
+    almacen_id TEXT NOT NULL,
+    ubicacion_nombre TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (producto_id, almacen_id)
+  );
+
   -- Tabla de stock derivado (cache)
   -- El stock NUNCA se calcula localmente: llega del API en cada sync
   -- (es un valor derivado del kardex completo del servidor).
@@ -153,6 +164,7 @@ export const createTablesSQL = `
   CREATE INDEX IF NOT EXISTS idx_qrs_estado ON qrs_cache(estado);
   CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos_cache(codigo);
   CREATE INDEX IF NOT EXISTS idx_niveles_almacen ON niveles_stock_cache(almacen_id);
+  CREATE INDEX IF NOT EXISTS idx_bins_almacen ON producto_ubicacion_cache(almacen_id);
   CREATE INDEX IF NOT EXISTS idx_stock_producto ON stock_cache(producto_id);
   CREATE INDEX IF NOT EXISTS idx_stock_almacen ON stock_cache(almacen_id);
   CREATE INDEX IF NOT EXISTS idx_pendientes_sincronizado ON movimientos_pendientes(sincronizado);

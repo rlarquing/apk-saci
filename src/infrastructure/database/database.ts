@@ -56,6 +56,7 @@ async function migrateSchema(): Promise<void> {
         DROP TABLE IF EXISTS almacenes_cache;
         DROP TABLE IF EXISTS categorias_cache;
         DROP TABLE IF EXISTS movimientos_pendientes;
+        DROP TABLE IF EXISTS producto_ubicacion_cache;
       `);
 
       // Guardar nueva versión
@@ -145,6 +146,7 @@ export async function clearCache(): Promise<void> {
     await database.runAsync('DELETE FROM stock_cache');
     await database.runAsync('DELETE FROM categorias_cache');
     await database.runAsync('DELETE FROM almacenes_cache');
+    await database.runAsync('DELETE FROM producto_ubicacion_cache');
   });
 }
 

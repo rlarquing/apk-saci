@@ -43,6 +43,19 @@ export interface RegistrarMovimientoData {
    */
   fecha?: string;
   observaciones?: string;
+  /** Lote de la mercancía (≤50; opcional, capturado en la entrada — P3) */
+  lote?: string;
+  /** Caducidad del lote en ISO (opcional — P3) */
+  fechaCaducidad?: string;
+}
+
+/**
+ * Información opcional de lote/caducidad capturada en el modal de cantidad
+ * (solo entradas — P3). Si el operario no la rellena no se envía nada.
+ */
+export interface LoteInfo {
+  lote?: string;
+  fechaCaducidad?: string;
 }
 
 /**

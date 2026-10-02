@@ -25,6 +25,10 @@ import { useNetwork, setAutoSyncCallback } from '@/src/presentation';
 import { serviceContainer } from '@/src/infrastructure/di/ServiceContainer';
 import { COLORS } from '@/src/shared/constants';
 import { TipoOperacion } from '@/src/domain';
+import { LoteInventarioApiDto } from '@/src/data/dtos';
+
+/** Ámbar para lotes próximos a vencer (backlog P3) */
+const AMBAR_VENCIMIENTO = '#b45309';
 
 export default function MainScreen() {
   const router = useRouter();
@@ -35,6 +39,29 @@ export default function MainScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  /** Lotes vencidos o próximos a vencer (solo online — backlog P3) */
+  const [lotesAlerta, setLotesAlerta] = useState<LoteInventarioApiDto[] | null>(null);
+
+  /**
+   * Lotes vencidos o por vencer en 30 días (GET /api/movimiento-inventario/
+   * lotes?diasProximo=30). SOLO online: si la red falla se oculta la card
+   * (null), nunca rompe el dashboard. checkConnection() fresco (no el estado
+   * del hook) para evitar closures obsoletos al recuperar el foco.
+   */
+  const cargarLotesAlerta = async () => {
+    try {
+      if (!(await serviceContainer.network.checkConnection())) {
+        setLotesAlerta(null);
+        return;
+      }
+      const filas = await serviceContainer.remoteMovimiento.obtenerLotes(30);
+      setLotesAlerta(
+        filas.filter(f => f.estado === 'VENCIDO' || f.estado === 'PROXIMO')
+      );
+    } catch {
+      setLotesAlerta(null);
+    }
+  };
 
   /**
    * Marca la bandera de "primera sincronización" solo si la base local
@@ -58,6 +85,7 @@ export default function MainScreen() {
       onComplete: () => {
         loadPendingCount();
         refreshResumen();
+        cargarLotesAlerta();
       },
     });
     await maybeMarkFirstSyncDone();
@@ -106,6 +134,7 @@ export default function MainScreen() {
       loadPendingCount();
       refreshResumen();
       maybeFirstSync();
+      cargarLotesAlerta();
     }, [refreshResumen])
   );
 
@@ -118,6 +147,7 @@ export default function MainScreen() {
     setRefreshing(true);
     await refreshResumen();
     await loadPendingCount();
+    await cargarLotesAlerta();
     setRefreshing(false);
   };
 
@@ -350,6 +380,45 @@ export default function MainScreen() {
           </View>
         )}
 
+        {/* Próximos a vencer (solo online — backlog P3): vencidos en rojo,
+            próximos en ámbar. Sin conexión la card no se muestra. */}
+        {lotesAlerta && lotesAlerta.length > 0 && (
+          <View style={styles.lotesCard}>
+            <View style={styles.lotesHeader}>
+              <MaterialCommunityIcons name="calendar-alert" size={18} color={AMBAR_VENCIMIENTO} />
+              <Text style={styles.lotesTitulo}>Próximos a vencer</Text>
+              <Text style={styles.lotesContador}>{lotesAlerta.length}</Text>
+            </View>
+            {lotesAlerta.slice(0, 3).map((lote, index) => {
+              const vencido = lote.estado === 'VENCIDO';
+              const color = vencido ? COLORS.error : AMBAR_VENCIMIENTO;
+              return (
+                <View key={`${lote.productoId}-${lote.lote || index}`} style={styles.loteRow}>
+                  <View style={styles.loteInfo}>
+                    <Text style={styles.loteProducto} numberOfLines={1}>
+                      {lote.productoCodigo} · {lote.productoNombre}
+                    </Text>
+                    <Text style={[styles.loteMeta, { color }]}>
+                      {lote.lote ? `Lote: ${lote.lote}` : 'Sin lote'}
+                      {` · stock ${lote.stock}`}
+                    </Text>
+                  </View>
+                  <Text style={[styles.loteDias, { color }]}>
+                    {vencido
+                      ? `Vencido${typeof lote.diasParaVencer === 'number' ? ` hace ${Math.abs(lote.diasParaVencer)} d` : ''}`
+                      : typeof lote.diasParaVencer === 'number'
+                        ? `${lote.diasParaVencer} días`
+                        : 'Próximo'}
+                  </Text>
+                </View>
+              );
+            })}
+            {lotesAlerta.length > 3 && (
+              <Text style={styles.loteMas}>+{lotesAlerta.length - 3} más</Text>
+            )}
+          </View>
+        )}
+
         {/* Pendientes de sincronización */}
         {pendingCount > 0 && (
           <TouchableOpacity style={styles.syncBanner} onPress={handleSync} disabled={isSyncing}>
@@ -564,6 +633,69 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 6,
+  },
+  lotesCard: {
+    backgroundColor: COLORS.secondary,
+    borderRadius: 15,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(180, 83, 9, 0.45)',
+  },
+  lotesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  lotesTitulo: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  lotesContador: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '700',
+    backgroundColor: AMBAR_VENCIMIENTO,
+    borderRadius: 12,
+    minWidth: 24,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    textAlign: 'center',
+    overflow: 'hidden',
+  },
+  loteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  loteInfo: {
+    flex: 1,
+  },
+  loteProducto: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  loteMeta: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  loteDias: {
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  loteMas: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'right',
   },
   syncBannerText: {
     color: COLORS.white,
